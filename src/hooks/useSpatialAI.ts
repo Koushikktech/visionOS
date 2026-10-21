@@ -536,24 +536,29 @@ export function useSpatialAI(
       localStorage.setItem('visionos_chat_v2', serialized);
       localStorage.setItem('canvasos_chat_v2', serialized);
     } catch {
+      try {
+        const compact = JSON.stringify(
+          messages.slice(-60).map(({ thought, ...m }) => ({
             ...m,
             executedActions: m.executedActions?.map((a) => ({
               ...a,
               rawFrame: {
                 t: 'patch',
                 op: a.op,
-                id: a.rawFrame.id,
-                target: a.rawFrame.target,
-                title: a.rawFrame.title,
+                id: a.rawFrame?.id,
+                target: a.rawFrame?.target,
+                title: a.rawFrame?.title,
               },
             })),
           }))
-        )
-      );
-    } catch {
-      setStorageWarning(
-        'Chat could not be saved. Export this conversation before closing.'
-      );
+        );
+        localStorage.setItem('visionos_chat_v2', compact);
+        localStorage.setItem('canvasos_chat_v2', compact);
+      } catch {
+        setStorageWarning(
+          'Chat could not be saved. Export this conversation before closing.'
+        );
+      }
     }
   }, [messages, historyLoaded, isGenerating, isMakingReal]);
   useEffect(() => {
