@@ -203,7 +203,7 @@ body { background: #000; }
 <html>
 <body>
 <script>
-  const title = 'CanvasOS';
+  const title = 'VisionOS';
   const header = \`Welcome to \${title}\`;
   const code = \`const x = 1;\`;
 </script>

@@ -184,7 +184,7 @@ export const ApplePagesPill: React.FC<ApplePagesPillProps> = ({ editor }) => {
     const blob = new Blob(
       [
         JSON.stringify({
-          format: 'canvasos-backup-v1',
+          format: 'visionos-backup-v1',
           snapshot: editor.getSnapshot(),
         }),
       ],
@@ -193,7 +193,7 @@ export const ApplePagesPill: React.FC<ApplePagesPillProps> = ({ editor }) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'canvasos-workspace.json';
+    link.download = 'visionos-workspace.json';
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setFileStatus('Workspace backup downloaded.');
@@ -205,8 +205,10 @@ export const ApplePagesPill: React.FC<ApplePagesPillProps> = ({ editor }) => {
     try {
       if (file.size > 25_000_000) throw new Error('Backup exceeds 25 MB.');
       const data = JSON.parse(await file.text());
-      if (data.format !== 'canvasos-backup-v1' || !data.snapshot?.document)
-        throw new Error('Choose a CanvasOS workspace backup.');
+      const isValidFormat =
+        data.format === 'visionos-backup-v1' || data.format === 'canvasos-backup-v1';
+      if (!isValidFormat || !data.snapshot?.document)
+        throw new Error('Choose a VisionOS workspace backup.');
       if (
         !window.confirm(
           'Restore this workspace backup? Your current workspace can be recovered with Restore previous workspace until you refresh.'

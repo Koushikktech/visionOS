@@ -553,7 +553,7 @@ describe('Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite'
       expect(code).toContain("isCanvasDragging ? 'canvas-is-dragging' : ''");
 
       // HUD protection check: clicks on dock or popovers do not trigger canvas drag
-      expect(code).toContain(".closest('.liquid-glass-dock, .liquid-glass-popover, aside[aria-label*=\"Siri\"], .canvasos-hud')");
+      expect(code).toContain(".closest('.liquid-glass-dock, .liquid-glass-popover, aside[aria-label*=\"Siri\"], .canvasos-hud, .visionos-hud')");
     });
   });
 });

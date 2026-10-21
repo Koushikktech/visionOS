@@ -1,5 +1,5 @@
 /**
- * CanvasOS Apple Design System Tokens & Helper Utilities
+ * VisionOS Apple Design System Tokens & Helper Utilities
  * Strictly grounded in Apple Human Interface Guidelines and tactile design engineering principles.
  */
 

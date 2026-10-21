@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (error) {
     console.error(
-      '[CanvasOS] Provider connection failed',
+      '[VisionOS] Provider connection failed',
       error instanceof Error ? error.name : 'unknown'
     );
     return Response.json(

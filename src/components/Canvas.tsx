@@ -257,7 +257,7 @@ export default function Canvas() {
       // Ignore HUD interactions
       const target = e.target as HTMLElement | null;
       if (
-        target?.closest('.liquid-glass-dock, .liquid-glass-popover, aside[aria-label*="Siri"], .canvasos-hud') ||
+        target?.closest('.liquid-glass-dock, .liquid-glass-popover, aside[aria-label*="Siri"], .canvasos-hud, .visionos-hud') ||
         target?.closest('aside[data-visionos-panel="true"], aside[aria-label*="visionOS"]')
       ) {
         return;
@@ -337,7 +337,7 @@ export default function Canvas() {
           of the custom Apple-grade floating Island Dock and HUD system. */}
       <Tldraw
         hideUi={true}
-        persistenceKey="canvasos-board-store"
+        persistenceKey="visionos-board-store"
         shapeUtils={customShapeUtils}
         autoFocus
         inferDarkMode

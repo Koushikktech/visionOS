@@ -62,22 +62,25 @@ samp {
 }
 
 /*
- * CanvasOS chrome occupies a secondary top lane. Tldraw's native page menu
+ * VisionOS chrome occupies a secondary top lane. Tldraw's native page menu
  * and style panel remain in the top corners, while our brand badge sits below
  * them and the action rail sits below the centered command pill. This keeps
  * both sets of controls accessible without stacking one panel over another.
  */
+.visionos-toolbar,
 .canvasos-toolbar {
   min-height: 44px;
 }
 
 /* Leave the native page menu's expanded list its own left-side column. */
+.visionos-brand,
 .canvasos-brand {
   position: absolute;
   left: 17rem;
   top: 0;
 }
 
+.visionos-toolbar-actions,
 .canvasos-toolbar-actions {
   max-width: calc(100vw - 3rem);
   white-space: nowrap;
@@ -86,34 +89,41 @@ samp {
 /* Space-drag and marquee selection should reach tldraw even when the pointer starts over or crosses a live
  * artifact preview. Normal preview interaction remains enabled otherwise. */
 .canvas-pan-mode iframe,
+.canvas-pan-mode .visionos-artifact-frame,
 .canvas-pan-mode .canvasos-artifact-frame,
 .canvas-is-dragging iframe,
+.canvas-is-dragging .visionos-artifact-frame,
 .canvas-is-dragging .canvasos-artifact-frame {
   pointer-events: none !important;
 }
 
 @media (max-width: 900px) {
+  .visionos-toolbar,
   .canvasos-toolbar {
     left: 1rem;
     right: 1rem;
   }
 
+  .visionos-brand,
   .canvasos-brand {
     display: none;
   }
 
+  .visionos-toolbar-actions,
   .canvasos-toolbar-actions {
     max-width: calc(100vw - 2rem);
     overflow-x: auto;
     scrollbar-width: none;
   }
 
+  .visionos-toolbar-actions::-webkit-scrollbar,
   .canvasos-toolbar-actions::-webkit-scrollbar {
     display: none;
   }
 }
 
 @media (max-width: 640px) {
+  .visionos-toolbar,
   .canvasos-toolbar {
     top: 4.25rem;
   }

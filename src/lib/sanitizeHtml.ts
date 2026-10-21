@@ -1,5 +1,5 @@
 /**
- * Universal HTML and Code Sanitizer for CanvasOS
+ * Universal HTML and Code Sanitizer for VisionOS
  * Strips markdown code fences (```html, ```xml, ```, etc.), conversational wrappers,
  * and extracts pure executable code for sandboxed iframe execution.
  * Pure TypeScript — compatible with Edge Runtime, Node.js, Web Workers, and Browser.

@@ -60,16 +60,16 @@ export const SpatialToolbar: React.FC<SpatialToolbarProps> = ({ editor, spatial 
   };
 
   return (
-    <header className="canvasos-toolbar pointer-events-none fixed top-16 left-6 right-6 z-[320] flex items-center justify-between">
+    <header className="visionos-toolbar canvasos-toolbar pointer-events-none fixed top-16 left-6 right-6 z-[320] flex items-center justify-between">
       {/* Left: Brand & Engine Telemetry */}
-      <div className="canvasos-brand pointer-events-auto flex items-center gap-3 rounded-2xl liquid-glass-elevated px-3.5 py-2">
+      <div className="visionos-brand canvasos-brand pointer-events-auto flex items-center gap-3 rounded-2xl liquid-glass-elevated px-3.5 py-2">
         <div className="flex items-center gap-2.5">
           <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 shadow-sm">
             <Sparkles className="h-3.5 w-3.5 text-white" />
           </div>
           <div className="flex flex-col">
             <span className="text-xs font-bold tracking-wider text-white">
-              CanvasOS
+              VisionOS
             </span>
             <span className="text-[9px] font-mono text-indigo-300">
               AI-First Spatial OS
@@ -93,7 +93,7 @@ export const SpatialToolbar: React.FC<SpatialToolbarProps> = ({ editor, spatial 
 
 
       {/* Right: Canvas & Layout Controls */}
-      <div className="canvasos-toolbar-actions pointer-events-auto absolute left-1/2 top-0 -translate-x-1/2 flex items-center gap-1.5 rounded-2xl liquid-glass-elevated p-1.5">
+      <div className="visionos-toolbar-actions canvasos-toolbar-actions pointer-events-auto absolute left-1/2 top-0 -translate-x-1/2 flex items-center gap-1.5 rounded-2xl liquid-glass-elevated p-1.5">
         {/* Undo / Redo */}
         <button
           onClick={handleUndo}

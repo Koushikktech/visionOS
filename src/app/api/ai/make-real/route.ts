@@ -284,8 +284,8 @@ export async function POST(req: NextRequest) {
               headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${curKey.trim()}`,
-                'HTTP-Referer': 'https://canvasos.local',
-                'X-Title': 'CanvasOS Make Real',
+                'HTTP-Referer': 'https://visionos.local',
+                'X-Title': 'VisionOS Make Real',
               },
               body: JSON.stringify(payload),
             }
@@ -308,7 +308,7 @@ export async function POST(req: NextRequest) {
             ? `${fetchErr?.message || String(fetchErr)}: ${cause}`
             : fetchErr?.message || String(fetchErr);
           console.error(
-            `[CanvasOS Make Real] OpenRouter fetch error for key #${i + 1}:`,
+            `[VisionOS Make Real] OpenRouter fetch error for key #${i + 1}:`,
             lastErrorText
           );
         }
@@ -438,7 +438,7 @@ export async function POST(req: NextRequest) {
           ? `${fetchErr?.message || String(fetchErr)}: ${cause}`
           : fetchErr?.message || String(fetchErr);
         console.error(
-          `[CanvasOS Make Real] Gemini fetch error for key #${i + 1} (${targetModel}):`,
+          `[VisionOS Make Real] Gemini fetch error for key #${i + 1} (${targetModel}):`,
           lastErrorText
         );
       }
@@ -493,7 +493,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('[CanvasOS Make Real] Error:', error);
+    console.error('[VisionOS Make Real] Error:', error);
     return new Response(JSON.stringify({ error: errorMsg }), {
       status: 502,
       headers: { 'Content-Type': 'application/json' },

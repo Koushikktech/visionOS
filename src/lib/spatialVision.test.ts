@@ -50,7 +50,7 @@ describe('spatialVision utilities', () => {
           {
             type: 'paragraph',
             content: [
-              { type: 'text', text: 'CanvasOS ' },
+              { type: 'text', text: 'VisionOS ' },
               { type: 'text', text: 'Architecture' },
             ],
           },
@@ -61,7 +61,7 @@ describe('spatialVision utilities', () => {
         ],
       };
       const text = extractPlainTextFromRichText(richText);
-      expect(text).toBe('CanvasOS Architecture\nSpatial Vision Engine');
+      expect(text).toBe('VisionOS Architecture\nSpatial Vision Engine');
     });
   });
 

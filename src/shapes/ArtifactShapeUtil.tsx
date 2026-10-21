@@ -229,7 +229,7 @@ function ArtifactComponent({
     const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src * data: blob: https:; font-src * data: https:; media-src * data: blob: https:; connect-src * https: wss:;">`;
 
     const runtimeScript = `
-    <script id="__canvasos_runtime__">
+    <script id="__visionos_runtime__">
     (function() {
       const shapeId = ${safeShapeId};
       const initialData = ${safeBootstrapStorage};
@@ -242,12 +242,12 @@ function ArtifactComponent({
           try {
             const snapshot = Object.fromEntries(store.entries());
             window.parent.postMessage({
-              type: 'CANVASOS_STORAGE_SYNC',
+              type: 'VISIONOS_STORAGE_SYNC',
               shapeId: shapeId,
               storage: snapshot
             }, '*');
           } catch (err) {
-            console.error('[CanvasOS Runtime] Storage sync error:', err);
+            console.error('[VisionOS Runtime] Storage sync error:', err);
           }
         }, 120);
       }
@@ -308,8 +308,8 @@ function ArtifactComponent({
         try { window.sessionStorage = virtualStorage; } catch (e2) {}
       }
 
-      // Provide native CanvasOS developer & AI helper SDK
-      window.CanvasOS = {
+      // Provide native VisionOS developer & AI helper SDK
+      const sdk = {
         shapeId: shapeId,
         storage: virtualStorage,
         db: {
@@ -336,6 +336,8 @@ function ArtifactComponent({
           }
         }
       };
+      window.VisionOS = sdk;
+      window.CanvasOS = sdk; // Backward compatibility alias
 
       // Handle programmatic storage overwrite from parent
       window.addEventListener('message', function(e) {
@@ -383,7 +385,7 @@ function ArtifactComponent({
     </script>`;
 
     const baseStyle = `
-    <style id="__canvasos_base_style__">
+    <style id="__visionos_base_style__">
       * { box-sizing: border-box; }
       html, body {
         margin: 0;
@@ -568,7 +570,7 @@ function ArtifactComponent({
             srcDoc={srcDoc}
             sandbox="allow-scripts allow-modals allow-forms"
             title={title}
-            className="canvasos-artifact-frame h-full w-full border-none"
+            className="visionos-artifact-frame canvasos-artifact-frame h-full w-full border-none"
           />
         ) : (
           <textarea

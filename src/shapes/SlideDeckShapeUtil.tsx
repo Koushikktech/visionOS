@@ -76,7 +76,7 @@ export class SlideDeckShapeUtil extends BaseBoxShapeUtil<TLSlideDeckShape> {
       slides: [
         {
           id: 'slide-1',
-          title: 'Welcome to CanvasOS Deck',
+          title: 'Welcome to VisionOS Deck',
           subtitle: 'Interactive Spatial Slide Deck',
           layout: 'hero',
           bullets: ['Visual canvas architecture', 'Fully persistent records', 'Spatial multi-agent integration'],
@@ -332,7 +332,7 @@ function SlideDeckCard({ shape, util }: { shape: TLSlideDeckShape; util: SlideDe
       {/* Bottom Slide Pager Bar */}
       <div className="flex min-h-[40px] shrink-0 items-center justify-between border-t border-white/5 px-4 bg-white/[0.02]">
         <span className="text-[10px] font-mono text-white/40">
-          CanvasOS Presentation View
+          VisionOS Presentation View
         </span>
 
         {/* Thumbnail Dots */}

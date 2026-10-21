@@ -20,7 +20,7 @@ export function formatSlideNumber(currentIdx: number, totalSlides: number): stri
 
 /**
  * Latency badge formatting utility with integer rounding
- * per CanvasOS streaming telemetry: `${Math.round(latencyMs)}ms`
+ * per VisionOS streaming telemetry: `${Math.round(latencyMs)}ms`
  */
 export function formatLatencyBadge(latencyMs: number): string {
   if (typeof latencyMs !== 'number' || isNaN(latencyMs) || latencyMs < 0) {

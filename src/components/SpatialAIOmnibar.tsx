@@ -946,7 +946,7 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                         How can I help you create?
                       </h3>
                       <p className="text-xs text-white/50 mt-1 max-w-[280px]">
-                        CanvasOS Spatial Intelligence generates shapes, apps,
+                        VisionOS Spatial Intelligence generates shapes, apps,
                         and documents right on your canvas.
                       </p>
                     </div>

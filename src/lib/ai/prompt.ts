@@ -2,7 +2,7 @@ import type { AISpatialChatRequest, SpatialActionFrame } from '@/types/spatial';
 import { stripMarkdownFences } from '@/lib/sanitizeHtml';
 
 /**
- * CanvasOS Spatial Operating System Kernel
+ * VisionOS Spatial Operating System Kernel
  * Master System Prompt & Spatial Invariants
  */
 export { PROMPT_VERSION } from './prompts';
@@ -205,7 +205,7 @@ function cleanPatch<T extends Record<string, any>>(obj: T): Partial<T> {
 }
 
 /**
- * Converts native LLM function call to CanvasOS SpatialActionFrame
+ * Converts native LLM function call to VisionOS SpatialActionFrame
  *
  * NOTE on `op` naming: most ops mirror their tool name 1:1, but a few are
  * intentionally shortened for the downstream reducer:
@@ -353,7 +353,7 @@ export function convertToolCallToActionFrame(name: string, args: any): SpatialAc
       id: args?.id || `doc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       title: args?.title || 'Document',
       subtitle: args?.subtitle,
-      author: args?.author || 'CanvasOS AI',
+      author: args?.author || 'VisionOS AI',
       date: args?.date,
       sections: args?.sections || [],
       relative: args?.relative || 'center',
@@ -421,7 +421,7 @@ export function convertToolCallToActionFrame(name: string, args: any): SpatialAc
     }) as SpatialActionFrame;
   }
 
-  console.warn('[CanvasOS Tool Parser] Unrecognized tool name received:', name, args);
+  console.warn('[VisionOS Tool Parser] Unrecognized tool name received:', name, args);
   return null;
 }
 
@@ -519,13 +519,13 @@ export const CANVAS_TOOLS = [
   },
   {
     name: 'spawn_artifact',
-    description: 'Spawns an interactive live sandbox running HTML5, CSS, and JavaScript web applications, widgets, or simulations with built-in persistent virtual storage (localStorage / CanvasOS.db).',
+    description: 'Spawns an interactive live sandbox running HTML5, CSS, and JavaScript web applications, widgets, or simulations with built-in persistent virtual storage (localStorage / VisionOS.db).',
     parameters: {
       type: 'object',
       properties: {
         id: { type: 'string', description: 'Unique semantic ID (e.g. "app_todo_list", "sim_particles")' },
         title: { type: 'string', description: 'Header title of the application or simulation' },
-        code: { type: 'string', description: 'Self-contained HTML5 + CSS + JS code. Can read and write to localStorage or CanvasOS.db for persistent state across refreshes.' },
+        code: { type: 'string', description: 'Self-contained HTML5 + CSS + JS code. Can read and write to localStorage or VisionOS.db for persistent state across refreshes.' },
         width: { type: 'number', description: 'Optimal responsive viewport width (e.g. 880-1024 for dashboards, 780-840 for standard apps, 460-520 for widgets). Default: 780.' },
         height: { type: 'number', description: 'Optimal responsive viewport height (e.g. 600-720 for dashboards, 540-600 for standard apps, 480-560 for widgets). Default: 540.' },
         relative: {
@@ -738,7 +738,7 @@ export const CANVAS_TOOLS = [
         id: { type: 'string', description: 'Unique semantic ID (e.g. "doc_consensus_spec", "doc_ai_whitepaper")' },
         title: { type: 'string', description: 'Document title' },
         subtitle: { type: 'string', description: 'Optional document subtitle' },
-        author: { type: 'string', description: 'Author name (e.g. "CanvasOS AI", "Research Lab")' },
+        author: { type: 'string', description: 'Author name (e.g. "VisionOS AI", "Research Lab")' },
         date: { type: 'string', description: 'Date string (e.g. "September 2026")' },
         sections: {
           type: 'array',

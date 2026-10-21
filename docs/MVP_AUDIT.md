@@ -1,4 +1,4 @@
-# CanvasOS independent MVP audit — 21 October 2026
+# VisionOS independent MVP audit — 21 October 2026
 
 Baseline: Next 15.5.23 / React 19 / tldraw 3. The workspace has no Git repository, no environment file, and no provider credentials configured. Existing Bun tests pass and TypeScript passes. Most UI tests inspect source strings or reimplement behavior; they are not browser tests. Prior PROJECT.md completion claims are not release evidence.
 

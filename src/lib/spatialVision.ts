@@ -82,7 +82,7 @@ export function extractPlainTextFromRichText(richText: any): string | undefined 
 }
 
 /**
- * Extracts comprehensive textual/semantic representation from any tldraw or custom CanvasOS shape props
+ * Extracts comprehensive textual/semantic representation from any tldraw or custom VisionOS shape props
  */
 export function extractShapeSemanticText(props: Record<string, any> | undefined): string | undefined {
   if (!props) return undefined;
@@ -279,7 +279,7 @@ export async function compressImageToJpeg(
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // Solid canvas background (dark slate matching CanvasOS canvas theme)
+      // Solid canvas background (dark slate matching VisionOS canvas theme)
       // prevents black background artifacts when transparent PNG is converted to JPEG
       ctx.fillStyle = '#0b0d18';
       ctx.fillRect(0, 0, width, height);

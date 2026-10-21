@@ -1,7 +1,7 @@
-# Project: CanvasOS Apple-Grade Remake & Architecture Revamp
+# Project: VisionOS Apple-Grade Remake & Architecture Revamp
 
 ## Architecture
-CanvasOS is an AI-native spatial canvas operating system built on Next.js 15, React 19, and the tldraw v3 canvas substrate, with a Kiwi.js Cassowary layout solver and multi-agent AI assistants.
+VisionOS is an AI-native spatial canvas operating system built on Next.js 15, React 19, and the tldraw v3 canvas substrate, with a Kiwi.js Cassowary layout solver and multi-agent AI assistants.
 This project executes a complete design remake and architectural revamp, replacing default tldraw UI chrome (`hideUi={true}`) with a custom, pixel-perfect Apple-grade floating HUD and canvas interface inspired by the macOS Sequoia Siri / Apple Intelligence glass aesthetic, in strict compliance with Apple Human Interface Guidelines and tactile design engineering principles.
 
 ```

@@ -490,13 +490,13 @@ function solveCreateDocument(
     h: cardH,
     title: frame.title || 'Document',
     subtitle: frame.subtitle,
-    author: frame.author || 'CanvasOS AI',
+    author: frame.author || 'VisionOS AI',
     date: frame.date || 'September 2026',
     sections: frame.sections || [
       {
         id: 'sec_1',
         title: 'Introduction',
-        content: 'Document initialized on CanvasOS.',
+        content: 'Document initialized on VisionOS.',
       },
     ],
   };

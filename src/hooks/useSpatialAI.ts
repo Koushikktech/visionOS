@@ -192,15 +192,21 @@ export function useSpatialAI(
   // Load preferences on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedProvider = localStorage.getItem('canvasos_ai_provider') as
-        'gemini' | 'openrouter' | null;
+      const savedProvider = (localStorage.getItem('visionos_ai_provider') ||
+        localStorage.getItem('canvasos_ai_provider')) as
+        | 'gemini'
+        | 'openrouter'
+        | null;
       if (savedProvider === 'gemini' || savedProvider === 'openrouter') {
         setProviderState(savedProvider);
       }
 
-      // Preserve the existing saved-key behavior. Recover keys from the temporary
-      // session-only migration introduced by the previous pass when possible.
+      // Preserve the existing saved-key behavior.
       for (const name of [
+        'visionos_gemini_api_keys',
+        'visionos_gemini_api_key',
+        'visionos_openrouter_api_keys',
+        'visionos_openrouter_api_key',
         'canvasos_gemini_api_keys',
         'canvasos_gemini_api_key',
         'canvasos_openrouter_api_keys',
@@ -211,54 +217,64 @@ export function useSpatialAI(
           if (temporary) localStorage.setItem(name, temporary);
         }
       }
-      // Load saved provider keys
-      const savedGeminiKeysJson = localStorage.getItem(
-        'canvasos_gemini_api_keys'
-      );
+      // Load saved provider keys (with fallback to legacy canvasos keys)
+      const savedGeminiKeysJson =
+        localStorage.getItem('visionos_gemini_api_keys') ||
+        localStorage.getItem('canvasos_gemini_api_keys');
       if (savedGeminiKeysJson) {
         const parsed = parseKeysList(savedGeminiKeysJson);
         if (parsed.length > 0) setGeminiApiKeysState(parsed);
       } else {
-        const legacyGeminiKey = localStorage.getItem('canvasos_gemini_api_key');
+        const legacyGeminiKey =
+          localStorage.getItem('visionos_gemini_api_key') ||
+          localStorage.getItem('canvasos_gemini_api_key');
         if (legacyGeminiKey) {
           const parsed = parseKeysList(legacyGeminiKey);
           if (parsed.length > 0) setGeminiApiKeysState(parsed);
         }
       }
 
-      // Load OpenRouter keys
-      const savedOpenRouterKeysJson = localStorage.getItem(
-        'canvasos_openrouter_api_keys'
-      );
+      // Load OpenRouter keys (with fallback to legacy canvasos keys)
+      const savedOpenRouterKeysJson =
+        localStorage.getItem('visionos_openrouter_api_keys') ||
+        localStorage.getItem('canvasos_openrouter_api_keys');
       if (savedOpenRouterKeysJson) {
         const parsed = parseKeysList(savedOpenRouterKeysJson);
         if (parsed.length > 0) setOpenRouterApiKeysState(parsed);
       } else {
-        const legacyOpenRouterKey = localStorage.getItem(
-          'canvasos_openrouter_api_key'
-        );
+        const legacyOpenRouterKey =
+          localStorage.getItem('visionos_openrouter_api_key') ||
+          localStorage.getItem('canvasos_openrouter_api_key');
         if (legacyOpenRouterKey) {
           const parsed = parseKeysList(legacyOpenRouterKey);
           if (parsed.length > 0) setOpenRouterApiKeysState(parsed);
         }
       }
 
-      const savedGeminiModel = localStorage.getItem('canvasos_gemini_model');
+      const savedGeminiModel =
+        localStorage.getItem('visionos_gemini_model') ||
+        localStorage.getItem('canvasos_gemini_model');
       if (savedGeminiModel) setGeminiModelState(savedGeminiModel);
 
-      const savedOpenRouterModel = localStorage.getItem(
-        'canvasos_openrouter_model'
-      );
+      const savedOpenRouterModel =
+        localStorage.getItem('visionos_openrouter_model') ||
+        localStorage.getItem('canvasos_openrouter_model');
       if (savedOpenRouterModel) setOpenRouterModelState(savedOpenRouterModel);
 
-      const savedThinking = localStorage.getItem('canvasos_thinking_mode');
+      const savedThinking =
+        localStorage.getItem('visionos_thinking_mode') ??
+        localStorage.getItem('canvasos_thinking_mode');
       if (savedThinking !== null)
         setThinkingModeState(savedThinking === 'true');
 
-      const savedSwarm = localStorage.getItem('canvasos_swarm_mode');
+      const savedSwarm =
+        localStorage.getItem('visionos_swarm_mode') ??
+        localStorage.getItem('canvasos_swarm_mode');
       if (savedSwarm !== null) setSwarmModeState(savedSwarm === 'true');
 
-      const savedTemp = localStorage.getItem('canvasos_temperature');
+      const savedTemp =
+        localStorage.getItem('visionos_temperature') ??
+        localStorage.getItem('canvasos_temperature');
       if (savedTemp) setTemperatureState(Number(savedTemp));
     }
   }, []);
@@ -266,6 +282,7 @@ export function useSpatialAI(
   const setProvider = useCallback((newProvider: 'gemini' | 'openrouter') => {
     setProviderState(newProvider);
     if (typeof window !== 'undefined') {
+      localStorage.setItem('visionos_ai_provider', newProvider);
       localStorage.setItem('canvasos_ai_provider', newProvider);
     }
   }, []);
@@ -273,6 +290,7 @@ export function useSpatialAI(
   const setThinkingMode = useCallback((val: boolean) => {
     setThinkingModeState(val);
     if (typeof window !== 'undefined') {
+      localStorage.setItem('visionos_thinking_mode', String(val));
       localStorage.setItem('canvasos_thinking_mode', String(val));
     }
   }, []);
@@ -280,6 +298,7 @@ export function useSpatialAI(
   const setSwarmMode = useCallback((val: boolean) => {
     setSwarmModeState(val);
     if (typeof window !== 'undefined') {
+      localStorage.setItem('visionos_swarm_mode', String(val));
       localStorage.setItem('canvasos_swarm_mode', String(val));
     }
   }, []);
@@ -287,6 +306,7 @@ export function useSpatialAI(
   const setTemperature = useCallback((val: number) => {
     setTemperatureState(val);
     if (typeof window !== 'undefined') {
+      localStorage.setItem('visionos_temperature', String(val));
       localStorage.setItem('canvasos_temperature', String(val));
     }
   }, []);
@@ -297,6 +317,8 @@ export function useSpatialAI(
       .filter((k) => k.length >= 8);
     setGeminiApiKeysState(cleaned);
     if (typeof window !== 'undefined') {
+      localStorage.setItem('visionos_gemini_api_keys', JSON.stringify(cleaned));
+      localStorage.setItem('visionos_gemini_api_key', cleaned[0] || '');
       localStorage.setItem('canvasos_gemini_api_keys', JSON.stringify(cleaned));
       localStorage.setItem('canvasos_gemini_api_key', cleaned[0] || '');
     }
@@ -308,6 +330,11 @@ export function useSpatialAI(
     setGeminiApiKeysState((prev) => {
       const merged = Array.from(new Set([...prev, ...newKeys]));
       if (typeof window !== 'undefined') {
+        localStorage.setItem(
+          'visionos_gemini_api_keys',
+          JSON.stringify(merged)
+        );
+        localStorage.setItem('visionos_gemini_api_key', merged[0] || '');
         localStorage.setItem(
           'canvasos_gemini_api_keys',
           JSON.stringify(merged)
@@ -322,6 +349,11 @@ export function useSpatialAI(
     setGeminiApiKeysState((prev) => {
       const filtered = prev.filter((k) => k !== keyToRemove);
       if (typeof window !== 'undefined') {
+        localStorage.setItem(
+          'visionos_gemini_api_keys',
+          JSON.stringify(filtered)
+        );
+        localStorage.setItem('visionos_gemini_api_key', filtered[0] || '');
         localStorage.setItem(
           'canvasos_gemini_api_keys',
           JSON.stringify(filtered)
@@ -346,6 +378,11 @@ export function useSpatialAI(
     setOpenRouterApiKeysState(cleaned);
     if (typeof window !== 'undefined') {
       localStorage.setItem(
+        'visionos_openrouter_api_keys',
+        JSON.stringify(cleaned)
+      );
+      localStorage.setItem('visionos_openrouter_api_key', cleaned[0] || '');
+      localStorage.setItem(
         'canvasos_openrouter_api_keys',
         JSON.stringify(cleaned)
       );
@@ -360,6 +397,11 @@ export function useSpatialAI(
       const merged = Array.from(new Set([...prev, ...newKeys]));
       if (typeof window !== 'undefined') {
         localStorage.setItem(
+          'visionos_openrouter_api_keys',
+          JSON.stringify(merged)
+        );
+        localStorage.setItem('visionos_openrouter_api_key', merged[0] || '');
+        localStorage.setItem(
           'canvasos_openrouter_api_keys',
           JSON.stringify(merged)
         );
@@ -373,6 +415,11 @@ export function useSpatialAI(
     setOpenRouterApiKeysState((prev) => {
       const filtered = prev.filter((k) => k !== keyToRemove);
       if (typeof window !== 'undefined') {
+        localStorage.setItem(
+          'visionos_openrouter_api_keys',
+          JSON.stringify(filtered)
+        );
+        localStorage.setItem('visionos_openrouter_api_key', filtered[0] || '');
         localStorage.setItem(
           'canvasos_openrouter_api_keys',
           JSON.stringify(filtered)
@@ -394,6 +441,7 @@ export function useSpatialAI(
     const cleaned = cleanHeaderValue(model);
     setGeminiModelState(cleaned);
     if (typeof window !== 'undefined') {
+      localStorage.setItem('visionos_gemini_model', cleaned);
       localStorage.setItem('canvasos_gemini_model', cleaned);
     }
   }, []);
@@ -402,6 +450,7 @@ export function useSpatialAI(
     const cleaned = cleanHeaderValue(model);
     setOpenRouterModelState(cleaned);
     if (typeof window !== 'undefined') {
+      localStorage.setItem('visionos_openrouter_model', cleaned);
       localStorage.setItem('canvasos_openrouter_model', cleaned);
     }
   }, []);
@@ -423,7 +472,9 @@ export function useSpatialAI(
   useEffect(() => {
     try {
       const saved = JSON.parse(
-        localStorage.getItem('canvasos_chat_v2') || 'null'
+        localStorage.getItem('visionos_chat_v2') ||
+        localStorage.getItem('canvasos_chat_v2') ||
+        'null'
       );
       if (Array.isArray(saved) && saved.length)
         setMessages(
@@ -457,17 +508,22 @@ export function useSpatialAI(
             .slice(-60)
         );
     } catch {
-      console.warn('[CanvasOS] Could not restore chat.');
+      console.warn('[VisionOS] Could not restore chat.');
     }
     setHistoryLoaded(true);
   }, []);
   useEffect(() => {
     if (!historyLoaded || isGenerating || isMakingReal) return;
     try {
-      localStorage.setItem(
-        'canvasos_chat_v2',
-        JSON.stringify(
-          messages.slice(-60).map(({ thought, ...m }) => ({
+      const serialized = JSON.stringify(
+        messages.slice(-60).map(({ thought, ...m }) => ({
+          ...m,
+          executedActions: m.executedActions?.slice(0, 100),
+        }))
+      );
+      localStorage.setItem('visionos_chat_v2', serialized);
+      localStorage.setItem('canvasos_chat_v2', serialized);
+    } catch {
             ...m,
             executedActions: m.executedActions?.map((a) => ({
               ...a,
@@ -705,7 +761,7 @@ export function useSpatialAI(
           }
         }
       } catch (e) {
-        console.warn('[CanvasOS] Could not pre-calculate skeleton placement:', e);
+        console.warn('[VisionOS] Could not pre-calculate skeleton placement:', e);
       }
 
       const timeout = setTimeout(() => turn.controller.abort(), 180000);
@@ -903,7 +959,7 @@ export function useSpatialAI(
             visualSnapshot = { mimeType: c.mimeType, base64: c.base64 };
           } catch (error) {
             console.warn(
-              '[CanvasOS] Visual capture unavailable; using structured context.'
+              '[VisionOS] Visual capture unavailable; using structured context.'
             );
           }
         }

@@ -135,7 +135,7 @@ function DocComponent({
     h,
     title = 'Untitled Document',
     subtitle,
-    author = 'CanvasOS AI',
+    author = 'VisionOS AI',
     date = 'September 2026',
     sections = [],
   } = shape.props;
@@ -152,7 +152,7 @@ function DocComponent({
       {
         id: 'sec_1',
         title: 'Overview',
-        content: 'Document initialized on CanvasOS.',
+        content: 'Document initialized on VisionOS.',
       },
     ];
   }, [sections]);
@@ -472,10 +472,10 @@ export class DocShapeUtil extends BaseBoxShapeUtil<TLDocShape> {
     return {
       w: 680,
       h: 520,
-      title: 'CanvasOS Technical Specification',
+      title: 'VisionOS Technical Specification',
       subtitle:
         'A comprehensive design document and architecture specification for multi-modal spatial computing.',
-      author: 'CanvasOS Kernel & Swarm',
+      author: 'VisionOS Kernel & Swarm',
       date: 'September 2026',
       sections: [
         {
@@ -483,7 +483,7 @@ export class DocShapeUtil extends BaseBoxShapeUtil<TLDocShape> {
           title: 'Executive Summary',
           badge: 'Overview',
           content:
-            'CanvasOS merges 2D spatial canvas computing with an autonomous Hermes-grade multi-agent swarm. By combining a Kiwi.js linear constraint solver with low-latency token streaming, CanvasOS delivers an AI workspace operating at 60 FPS.',
+            'VisionOS merges 2D spatial canvas computing with an autonomous Hermes-grade multi-agent swarm. By combining a Kiwi.js linear constraint solver with low-latency token streaming, VisionOS delivers an AI workspace operating at 60 FPS.',
         },
         {
           id: 'sec_2',

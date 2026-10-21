@@ -14,7 +14,7 @@ export function readStorageMessage(
     return null;
   const message = data as Record<string, unknown>;
   if (
-    message.type !== 'CANVASOS_STORAGE_SYNC' ||
+    (message.type !== 'VISIONOS_STORAGE_SYNC' && message.type !== 'CANVASOS_STORAGE_SYNC') ||
     message.shapeId !== id ||
     !message.storage ||
     typeof message.storage !== 'object' ||
