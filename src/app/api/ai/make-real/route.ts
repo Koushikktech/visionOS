@@ -408,7 +408,7 @@ export async function POST(req: NextRequest) {
     modelLoop: for (const targetModel of modelCandidates) {
       for (let i = 0; i < geminiKeys.length; i++) {
         const curKey = geminiKeys[i];
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(curKey.trim())}`;
         try {
           const res = await fetch(url, {
             method: 'POST',
@@ -431,7 +431,11 @@ export async function POST(req: NextRequest) {
             lastErrorText
           );
 
-          if (res.status === 404 || /not found|not supported/i.test(lastErrorText)) {
+          if (
+            res.status === 404 ||
+            res.status === 400 ||
+            /not found|not supported|invalid argument/i.test(lastErrorText)
+          ) {
             console.warn(
               `[VisionOS Make Real] Model ${targetModel} not available (HTTP ${res.status}), trying fallback...`
             );

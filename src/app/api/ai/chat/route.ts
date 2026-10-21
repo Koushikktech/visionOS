@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
         const url =
           provider === 'openrouter'
             ? 'https://openrouter.ai/api/v1/chat/completions'
-            : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:streamGenerateContent?alt=sse`;
+            : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(keys[i])}`;
         const headers: Record<string, string> =
           provider === 'openrouter'
             ? {
@@ -166,11 +166,15 @@ export async function POST(req: NextRequest) {
         ) {
           const error = await res.clone().text();
           if (/thinking|includeThoughts/i.test(error)) {
-            delete payload.generationConfig.thinkingConfig;
+            const cleanPayload = {
+              ...payload,
+              generationConfig: { ...payload.generationConfig },
+            };
+            delete cleanPayload.generationConfig.thinkingConfig;
             res = await fetch(url, {
               method: 'POST',
               headers,
-              body: JSON.stringify(payload),
+              body: JSON.stringify(cleanPayload),
               signal,
             });
           }
@@ -184,10 +188,12 @@ export async function POST(req: NextRequest) {
         const errText = await res.clone().text();
         await res.body?.cancel();
 
-        // If model not found or not supported, try next model candidate in chain
+        // If model not found or not supported or rejected parameters, try next model candidate in chain
         if (
           provider === 'gemini' &&
-          (res.status === 404 || /not found|not supported/i.test(errText))
+          (res.status === 404 ||
+            res.status === 400 ||
+            /not found|not supported|invalid argument/i.test(errText))
         ) {
           console.warn(
             `[VisionOS] Model ${currentModel} not available (HTTP ${res.status}), trying fallback...`

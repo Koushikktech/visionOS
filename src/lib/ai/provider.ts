@@ -21,15 +21,15 @@ export function getGeminiModelCandidateChain(requestedModel?: string | null): st
   const candidates: string[] = [primary];
 
   if (primary === 'gemini-3.8-flash') {
-    candidates.push('gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash');
+    candidates.push('gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash');
   } else if (primary === 'gemini-3.5-flash-lite') {
-    candidates.push('gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-8b', 'gemini-2.5-flash');
+    candidates.push('gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-8b', 'gemini-1.5-flash');
   } else if (primary === 'gemini-4-argon') {
-    candidates.push('gemini-2.5-pro', 'gemini-2.5-flash');
+    candidates.push('gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro');
   } else if (primary === 'gemini-2.5-flash') {
-    candidates.push('gemini-2.0-flash', 'gemini-1.5-flash');
+    candidates.push('gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-pro');
   } else {
-    candidates.push('gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash');
+    candidates.push('gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash');
   }
 
   return Array.from(new Set(candidates));

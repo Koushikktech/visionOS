@@ -320,9 +320,15 @@ export default function Canvas() {
         isOpen={showOnboarding}
         onClose={() => setShowOnboarding(false)}
         geminiKeys={ai.geminiApiKeys}
-        onSaveGeminiKey={(k) => ai.addGeminiKey(k)}
+        onSaveGeminiKey={(k) => {
+          ai.addGeminiKey(k);
+          ai.setProvider('gemini');
+        }}
         selectedModel={ai.geminiModel}
-        onSelectModel={(m) => ai.setGeminiModel(m)}
+        onSelectModel={(m) => {
+          ai.setGeminiModel(m);
+          ai.setProvider('gemini');
+        }}
         editor={editor}
       />
 

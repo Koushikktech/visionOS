@@ -348,9 +348,19 @@ export function useSpatialAI(
           JSON.stringify(merged)
         );
         localStorage.setItem('canvasos_gemini_api_key', merged[0] || '');
+        sessionStorage.setItem(
+          'visionos_gemini_api_keys',
+          JSON.stringify(merged)
+        );
+        sessionStorage.setItem('visionos_gemini_api_key', merged[0] || '');
       }
       return merged;
     });
+    setProviderState('gemini');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('visionos_ai_provider', 'gemini');
+      localStorage.setItem('canvasos_ai_provider', 'gemini');
+    }
   }, []);
 
   const removeGeminiKey = useCallback((keyToRemove: string) => {
@@ -603,6 +613,7 @@ export function useSpatialAI(
     model: activeModel,
     apiKeys: geminiApiKeys,
     openRouterApiKeys,
+    apiKey: activeApiKey,
   });
   const baseline = () =>
     new Map(

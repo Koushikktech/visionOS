@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
               };
         response = await fetch(
           provider === 'gemini'
-            ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:generateContent`
+            ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:generateContent?key=${encodeURIComponent(key)}`
             : 'https://openrouter.ai/api/v1/chat/completions',
           {
             method: 'POST',
@@ -124,7 +124,9 @@ export async function POST(req: NextRequest) {
         const errText = await response.clone().text();
         if (
           provider === 'gemini' &&
-          (response.status === 404 || /not found|not supported/i.test(errText))
+          (response.status === 404 ||
+            response.status === 400 ||
+            /not found|not supported|invalid argument/i.test(errText))
         ) {
           console.warn(
             `[VisionOS Swarm] Model ${currentModel} not available (HTTP ${response.status}), trying fallback...`

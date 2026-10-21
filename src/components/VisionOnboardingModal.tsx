@@ -107,10 +107,18 @@ export function VisionOnboardingModal({
   };
 
   const handleFinish = (stampSample: boolean) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visionos_onboarded_v1', 'true');
+    const trimmed = apiKeyInput.trim();
+    if (trimmed) {
+      onSaveGeminiKey(trimmed);
     }
     onSelectModel(chosenModel);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('visionos_onboarded_v1', 'true');
+      localStorage.setItem('visionos_ai_provider', 'gemini');
+      localStorage.setItem('visionos_gemini_model', chosenModel);
+      localStorage.setItem('canvasos_gemini_model', chosenModel);
+    }
 
     if (stampSample && editor) {
       try {
@@ -433,7 +441,12 @@ export function VisionOnboardingModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStep(3)}
+                  onClick={() => {
+                    if (apiKeyInput.trim()) {
+                      handleSaveKey();
+                    }
+                    setStep(3);
+                  }}
                   className="min-h-[44px] px-5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium inline-flex items-center gap-2 active:scale-[0.96] transition-all shadow-lg shadow-indigo-500/20"
                 >
                   <span>Continue</span>
