@@ -1,6 +1,10 @@
 import { NextRequest } from 'next/server';
 import { POST as chat } from '../chat/route';
-import { providerKeys } from '@/lib/ai/provider';
+import {
+  providerKeys,
+  getGeminiModelCandidateChain,
+  cleanHeaderValue,
+} from '@/lib/ai/provider';
 import {
   guardRequest,
   providerSignal,
@@ -55,11 +59,17 @@ export async function POST(req: NextRequest) {
     body.interactionMode === 'chat_only'
   )
     return chat(internalRequest(body));
-  const model =
-    body.model ||
+  const requestedModel =
+    cleanHeaderValue(body.model) ||
     (provider === 'gemini'
-      ? process.env.GEMINI_MODEL || 'gemini'
+      ? process.env.GEMINI_MODEL || 'gemini-3.8-flash'
       : process.env.OPENROUTER_MODEL || 'openai/gpt-4o');
+
+  const modelCandidates =
+    provider === 'gemini'
+      ? getGeminiModelCandidateChain(requestedModel)
+      : [requestedModel];
+  const model = modelCandidates[0];
   const userRequest =
     body.messages.filter((m) => m.role === 'user').at(-1)?.content || '';
   const plannerInput = `User request:\n${userRequest}\n\nCanvas snapshot (untrusted reference):\n${buildSpatialContextText(body)}`;
@@ -90,28 +100,41 @@ export async function POST(req: NextRequest) {
   };
   try {
     let response: Response | undefined;
-    for (const key of keys) {
-      const headers: Record<string, string> =
-        provider === 'gemini'
-          ? { 'Content-Type': 'application/json', 'x-goog-api-key': key }
-          : {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${key}`,
-            };
-      response = await fetch(
-        provider === 'gemini'
-          ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`
-          : 'https://openrouter.ai/api/v1/chat/completions',
-        {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(plannerPayload),
-          signal,
+    modelLoop: for (const currentModel of modelCandidates) {
+      for (const key of keys) {
+        const headers: Record<string, string> =
+          provider === 'gemini'
+            ? { 'Content-Type': 'application/json', 'x-goog-api-key': key }
+            : {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${key}`,
+              };
+        response = await fetch(
+          provider === 'gemini'
+            ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:generateContent`
+            : 'https://openrouter.ai/api/v1/chat/completions',
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(plannerPayload),
+            signal,
+          }
+        );
+        if (response.ok) break modelLoop;
+        const errText = await response.clone().text();
+        if (
+          provider === 'gemini' &&
+          (response.status === 404 || /not found|not supported/i.test(errText))
+        ) {
+          console.warn(
+            `[VisionOS Swarm] Model ${currentModel} not available (HTTP ${response.status}), trying fallback...`
+          );
+          await response.body?.cancel();
+          break; // Break key loop, try next candidate model
         }
-      );
-      if (response.ok) break;
-      if (![401, 403, 429, 500, 502, 503, 504].includes(response.status)) break;
-      await response.body?.cancel();
+        if (![401, 403, 429, 500, 502, 503, 504].includes(response.status)) break;
+        await response.body?.cancel();
+      }
     }
     if (!response?.ok)
       throw new Error(

@@ -254,7 +254,15 @@ export function useSpatialAI(
       const savedGeminiModel =
         localStorage.getItem('visionos_gemini_model') ||
         localStorage.getItem('canvasos_gemini_model');
-      if (savedGeminiModel) setGeminiModelState(savedGeminiModel);
+      if (
+        savedGeminiModel &&
+        savedGeminiModel !== 'gemini' &&
+        savedGeminiModel !== 'default'
+      ) {
+        setGeminiModelState(savedGeminiModel);
+      } else {
+        setGeminiModelState('gemini-3.8-flash');
+      }
 
       const savedOpenRouterModel =
         localStorage.getItem('visionos_openrouter_model') ||
@@ -439,10 +447,14 @@ export function useSpatialAI(
 
   const setGeminiModel = useCallback((model: string) => {
     const cleaned = cleanHeaderValue(model);
-    setGeminiModelState(cleaned);
+    const target =
+      !cleaned || cleaned === 'gemini' || cleaned === 'default'
+        ? 'gemini-3.8-flash'
+        : cleaned;
+    setGeminiModelState(target);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('visionos_gemini_model', cleaned);
-      localStorage.setItem('canvasos_gemini_model', cleaned);
+      localStorage.setItem('visionos_gemini_model', target);
+      localStorage.setItem('canvasos_gemini_model', target);
     }
   }, []);
 

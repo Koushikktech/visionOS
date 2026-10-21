@@ -13,7 +13,12 @@ import {
   providerSignal,
   validateChatRequest,
 } from '@/lib/ai/request';
-import { providerKeys, readSSE } from '@/lib/ai/provider';
+import {
+  providerKeys,
+  readSSE,
+  getGeminiModelCandidateChain,
+  cleanHeaderValue,
+} from '@/lib/ai/provider';
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
@@ -38,11 +43,17 @@ export async function POST(req: NextRequest) {
       },
       { status: 401 }
     );
-  const model =
-    body.model ||
+  const requestedModel =
+    cleanHeaderValue(body.model) ||
     (provider === 'gemini'
-      ? process.env.GEMINI_MODEL || 'gemini'
+      ? process.env.GEMINI_MODEL || 'gemini-3.8-flash'
       : process.env.OPENROUTER_MODEL || 'openai/gpt-4o');
+
+  const modelCandidates =
+    provider === 'gemini'
+      ? getGeminiModelCandidateChain(requestedModel)
+      : [requestedModel];
+  const model = modelCandidates[0];
   const allow = body.interactionMode !== 'chat_only';
   const signal = providerSignal(req);
   const system = `${SYSTEM_PROMPT}\n\n${buildSpatialContextText(body)}`;
@@ -127,50 +138,65 @@ export async function POST(req: NextRequest) {
   let usedKeyIndex = 0;
   let lastStatus = 502;
   try {
-    for (let i = 0; i < keys.length; i++) {
-      signal.throwIfAborted();
-      const url =
-        provider === 'openrouter'
-          ? 'https://openrouter.ai/api/v1/chat/completions'
-          : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
-      const headers: Record<string, string> =
-        provider === 'openrouter'
-          ? {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${keys[i]}`,
-            }
-          : { 'Content-Type': 'application/json', 'x-goog-api-key': keys[i] };
-      let res = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-        signal,
-      });
-      // Some models reject thinking settings; one compatible retry preserves all other options.
-      if (
-        provider === 'gemini' &&
-        res.status === 400 &&
-        payload.generationConfig?.thinkingConfig
-      ) {
-        const error = await res.clone().text();
-        if (/thinking|includeThoughts/i.test(error)) {
-          delete payload.generationConfig.thinkingConfig;
-          res = await fetch(url, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(payload),
-            signal,
-          });
+    modelLoop: for (const currentModel of modelCandidates) {
+      for (let i = 0; i < keys.length; i++) {
+        signal.throwIfAborted();
+        const url =
+          provider === 'openrouter'
+            ? 'https://openrouter.ai/api/v1/chat/completions'
+            : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:streamGenerateContent?alt=sse`;
+        const headers: Record<string, string> =
+          provider === 'openrouter'
+            ? {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${keys[i]}`,
+              }
+            : { 'Content-Type': 'application/json', 'x-goog-api-key': keys[i] };
+        let res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal,
+        });
+        // Some models reject thinking settings or parameters; retry with clean options
+        if (
+          provider === 'gemini' &&
+          res.status === 400 &&
+          payload.generationConfig?.thinkingConfig
+        ) {
+          const error = await res.clone().text();
+          if (/thinking|includeThoughts/i.test(error)) {
+            delete payload.generationConfig.thinkingConfig;
+            res = await fetch(url, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(payload),
+              signal,
+            });
+          }
         }
+        if (res.ok && res.body) {
+          upstream = res;
+          usedKeyIndex = i;
+          break modelLoop;
+        }
+        lastStatus = res.status;
+        const errText = await res.clone().text();
+        await res.body?.cancel();
+
+        // If model not found or not supported, try next model candidate in chain
+        if (
+          provider === 'gemini' &&
+          (res.status === 404 || /not found|not supported/i.test(errText))
+        ) {
+          console.warn(
+            `[VisionOS] Model ${currentModel} not available (HTTP ${res.status}), trying fallback...`
+          );
+          break; // break key loop to advance to next candidate model
+        }
+
+        if (![401, 403, 429, 500, 502, 503, 504].includes(res.status)) break;
       }
-      if (res.ok && res.body) {
-        upstream = res;
-        usedKeyIndex = i;
-        break;
-      }
-      lastStatus = res.status;
-      await res.body?.cancel();
-      if (![401, 403, 429, 500, 502, 503, 504].includes(res.status)) break;
     }
   } catch (error) {
     console.error(

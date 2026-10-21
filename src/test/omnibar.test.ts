@@ -12,6 +12,7 @@ import { SpatialAIOmnibar } from '@/components/SpatialAIOmnibar';
 import { SpeculativeSkeletonOverlay } from '@/components/SpeculativeSkeletonOverlay';
 import { AIAgentCursor } from '@/components/AIAgentCursor';
 import { VisionOnboardingModal, GEMINI_MODEL_PRESETS } from '@/components/VisionOnboardingModal';
+import { getGeminiModelCandidateChain } from '@/lib/ai/provider';
 
 describe('visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts)', () => {
   describe('Concentric Border Radii Contracts', () => {
@@ -83,6 +84,23 @@ describe('visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.tes
       expect(presetIds).toContain('gemini-3.8-flash');
       expect(presetIds).toContain('gemini-3.5-flash-lite');
       expect(presetIds).toContain('gemini-4-argon');
+    });
+
+    it('verifies getGeminiModelCandidateChain prioritizes gemini-3.8-flash and includes robust fallbacks', () => {
+      const candidates = getGeminiModelCandidateChain('gemini-3.8-flash');
+      expect(candidates[0]).toBe('gemini-3.8-flash');
+      expect(candidates).toContain('gemini-2.5-flash');
+      expect(candidates).toContain('gemini-2.0-flash');
+
+      // Legacy or empty fallback resolves to gemini-3.8-flash primary
+      const defaultCandidates = getGeminiModelCandidateChain('gemini');
+      expect(defaultCandidates[0]).toBe('gemini-3.8-flash');
+      expect(defaultCandidates).toContain('gemini-2.5-flash');
+
+      // Lite preset chain
+      const liteCandidates = getGeminiModelCandidateChain('gemini-3.5-flash-lite');
+      expect(liteCandidates[0]).toBe('gemini-3.5-flash-lite');
+      expect(liteCandidates).toContain('gemini-2.5-flash-lite');
     });
 
     it('verifies action badges compress long shape IDs into clean readable badges', () => {

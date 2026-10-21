@@ -388,9 +388,17 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
 
   // Settings State
-  const [modelInput, setModelInput] = useState('');
+  const [modelInput, setModelInput] = useState(() => ai.activeModel || 'gemini-3.8-flash');
   const [newKeyInput, setNewKeyInput] = useState('');
   const [isAddingKey, setIsAddingKey] = useState(false);
+
+  useEffect(() => {
+    if (ai.activeModel && ai.activeModel !== 'gemini') {
+      setModelInput(ai.activeModel);
+    } else {
+      setModelInput('gemini-3.8-flash');
+    }
+  }, [ai.activeModel]);
 
   // Voice Dictation with Web Speech API & Voice Glow
   const mic = useMicrophone();

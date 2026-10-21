@@ -65,7 +65,16 @@ export function VisionOnboardingModal({
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showKeyText, setShowKeyText] = useState(false);
-  const [chosenModel, setChosenModel] = useState(selectedModel || 'gemini-3.8-flash');
+  const [chosenModel, setChosenModel] = useState<string>(() => {
+    if (
+      selectedModel &&
+      selectedModel !== 'gemini' &&
+      GEMINI_MODEL_PRESETS.some((p) => p.id === selectedModel)
+    ) {
+      return selectedModel;
+    }
+    return 'gemini-3.8-flash';
+  });
   const [isKeySaved, setIsKeySaved] = useState(geminiKeys.length > 0);
 
   useEffect(() => {
@@ -74,10 +83,21 @@ export function VisionOnboardingModal({
     }
   }, [geminiKeys]);
 
+  useEffect(() => {
+    if (
+      selectedModel &&
+      selectedModel !== 'gemini' &&
+      GEMINI_MODEL_PRESETS.some((p) => p.id === selectedModel)
+    ) {
+      setChosenModel(selectedModel);
+    }
+  }, [selectedModel]);
+
   const handleSaveKey = () => {
     const trimmed = apiKeyInput.trim();
     if (!trimmed) return;
     onSaveGeminiKey(trimmed);
+    onSelectModel(chosenModel);
     setIsKeySaved(true);
   };
 
@@ -90,6 +110,7 @@ export function VisionOnboardingModal({
     if (typeof window !== 'undefined') {
       localStorage.setItem('visionos_onboarded_v1', 'true');
     }
+    onSelectModel(chosenModel);
 
     if (stampSample && editor) {
       try {

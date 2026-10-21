@@ -1,5 +1,40 @@
 import type { NextRequest } from 'next/server';
 import type { AIProvider } from '@/types/spatial';
+
+export function cleanHeaderValue(val?: string | null): string {
+  if (!val) return '';
+  return val.replace(/[^\x20-\x7E]/g, '').trim();
+}
+
+/**
+ * Returns prioritized model candidate chain.
+ * If the user's primary selection (e.g. 'gemini-3.8-flash') returns 404 or unsupported
+ * on their specific account/region, automatically fails over to active Gemini models.
+ */
+export function getGeminiModelCandidateChain(requestedModel?: string | null): string[] {
+  const cleaned = cleanHeaderValue(requestedModel);
+  const primary =
+    !cleaned || cleaned === 'gemini' || cleaned === 'default'
+      ? process.env.GEMINI_MODEL || 'gemini-3.8-flash'
+      : cleaned;
+
+  const candidates: string[] = [primary];
+
+  if (primary === 'gemini-3.8-flash') {
+    candidates.push('gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash');
+  } else if (primary === 'gemini-3.5-flash-lite') {
+    candidates.push('gemini-2.5-flash-lite', 'gemini-2.0-flash-lite', 'gemini-1.5-flash-8b', 'gemini-2.5-flash');
+  } else if (primary === 'gemini-4-argon') {
+    candidates.push('gemini-2.5-pro', 'gemini-2.5-flash');
+  } else if (primary === 'gemini-2.5-flash') {
+    candidates.push('gemini-2.0-flash', 'gemini-1.5-flash');
+  } else {
+    candidates.push('gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash');
+  }
+
+  return Array.from(new Set(candidates));
+}
+
 export function providerKeys(
   req: NextRequest,
   body: any,

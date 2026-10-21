@@ -2,6 +2,7 @@ import { MAKE_REAL_PROMPT } from '@/lib/ai/prompts';
 import { assertCompleteHtml } from '@/lib/ai/actions';
 import { guardRequest, providerSignal } from '@/lib/ai/request';
 import { stripMarkdownFences } from '@/lib/sanitizeHtml';
+import { getGeminiModelCandidateChain } from '@/lib/ai/provider';
 import { NextRequest } from 'next/server';
 import type { AIMakeRealRequest } from '@/types/spatial';
 
@@ -379,10 +380,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const targetModel =
-      cleanHeaderValue(body.model) ||
-      process.env.GEMINI_MODEL ||
-      'gemini';
+    const modelCandidates = getGeminiModelCandidateChain(body.model);
 
     const payload = JSON.stringify({
       systemInstruction: {
@@ -407,40 +405,49 @@ export async function POST(req: NextRequest) {
     let lastErrorText = '';
     let lastStatus = 500;
 
-    keyLoop: for (let i = 0; i < geminiKeys.length; i++) {
-      const curKey = geminiKeys[i];
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent`;
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          signal,
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': curKey.trim(),
-          },
-          body: payload,
-        });
+    modelLoop: for (const targetModel of modelCandidates) {
+      for (let i = 0; i < geminiKeys.length; i++) {
+        const curKey = geminiKeys[i];
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent`;
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            signal,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': curKey.trim(),
+            },
+            body: payload,
+          });
 
-        if (res.ok) {
-          geminiRes = res;
-          break keyLoop;
+          if (res.ok) {
+            geminiRes = res;
+            break modelLoop;
+          }
+          lastStatus = res.status;
+          lastErrorText = await res.text();
+          console.warn(
+            `Gemini (${targetModel}) key #${i + 1}/${geminiKeys.length} returned HTTP ${res.status}:`,
+            lastErrorText
+          );
+
+          if (res.status === 404 || /not found|not supported/i.test(lastErrorText)) {
+            console.warn(
+              `[VisionOS Make Real] Model ${targetModel} not available (HTTP ${res.status}), trying fallback...`
+            );
+            break; // Try next candidate model
+          }
+        } catch (fetchErr: any) {
+          signal.throwIfAborted();
+          const cause = fetchErr?.cause?.message || fetchErr?.cause;
+          lastErrorText = cause
+            ? `${fetchErr?.message || String(fetchErr)}: ${cause}`
+            : fetchErr?.message || String(fetchErr);
+          console.error(
+            `[VisionOS Make Real] Gemini fetch error for key #${i + 1} (${targetModel}):`,
+            lastErrorText
+          );
         }
-        lastStatus = res.status;
-        lastErrorText = await res.text();
-        console.warn(
-          `Gemini (${targetModel}) key #${i + 1}/${geminiKeys.length} returned HTTP ${res.status}:`,
-          lastErrorText
-        );
-      } catch (fetchErr: any) {
-        signal.throwIfAborted();
-        const cause = fetchErr?.cause?.message || fetchErr?.cause;
-        lastErrorText = cause
-          ? `${fetchErr?.message || String(fetchErr)}: ${cause}`
-          : fetchErr?.message || String(fetchErr);
-        console.error(
-          `[VisionOS Make Real] Gemini fetch error for key #${i + 1} (${targetModel}):`,
-          lastErrorText
-        );
       }
     }
 
