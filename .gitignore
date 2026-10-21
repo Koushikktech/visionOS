@@ -1,0 +1,40 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Next.js Build Output
+/.next/
+/out/
+/build
+*.tsbuildinfo
+
+# Environment & Local Secrets
+.env
+.env*.local
+.env.development
+.env.test
+.env.production
+!.env.example
+
+# Vercel
+.vercel
+
+# Testing & Logs
+/coverage
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# System & Editor Junk
+.DS_Store
+Thumbs.db
+*.pem
+
+# Scratch & Subagent Artifacts
+.aider-desk/
+.agents/
+skills-lock.json
+*.bak

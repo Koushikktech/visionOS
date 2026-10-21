@@ -1,0 +1,451 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import '@tldraw/tldraw/tldraw.css';
+@import 'katex/dist/katex.min.css';
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 10, 12, 16;
+  --background-end-rgb: 15, 17, 23;
+
+  /* Concentric border radius variables: outer = inner + padding */
+  --radius-inner-sm: 8px;
+  --radius-inner-md: 12px;
+  --radius-inner-lg: 16px;
+  --radius-inner-xl: 20px;
+  --radius-pad-sm: 4px;
+  --radius-pad-md: 8px;
+  --radius-pad-lg: 12px;
+  --radius-pad-xl: 16px;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: none;
+  touch-action: none;
+  background-color: #0b0d18;
+  color: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Monospace font stack for code elements */
+code,
+pre,
+kbd,
+samp {
+  font-family: "SF Mono", Menlo, Monaco, monospace;
+}
+
+/* Custom Dotted Grid styling on the canvas container */
+.canvas-wrapper {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+/*
+ * CanvasOS chrome occupies a secondary top lane. Tldraw's native page menu
+ * and style panel remain in the top corners, while our brand badge sits below
+ * them and the action rail sits below the centered command pill. This keeps
+ * both sets of controls accessible without stacking one panel over another.
+ */
+.canvasos-toolbar {
+  min-height: 44px;
+}
+
+/* Leave the native page menu's expanded list its own left-side column. */
+.canvasos-brand {
+  position: absolute;
+  left: 17rem;
+  top: 0;
+}
+
+.canvasos-toolbar-actions {
+  max-width: calc(100vw - 3rem);
+  white-space: nowrap;
+}
+
+/* Space-drag and marquee selection should reach tldraw even when the pointer starts over or crosses a live
+ * artifact preview. Normal preview interaction remains enabled otherwise. */
+.canvas-pan-mode iframe,
+.canvas-pan-mode .canvasos-artifact-frame,
+.canvas-is-dragging iframe,
+.canvas-is-dragging .canvasos-artifact-frame {
+  pointer-events: none !important;
+}
+
+@media (max-width: 900px) {
+  .canvasos-toolbar {
+    left: 1rem;
+    right: 1rem;
+  }
+
+  .canvasos-brand {
+    display: none;
+  }
+
+  .canvasos-toolbar-actions {
+    max-width: calc(100vw - 2rem);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .canvasos-toolbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .canvasos-toolbar {
+    top: 4.25rem;
+  }
+}
+
+/* Enhancing the tldraw container */
+.tl-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* KaTeX Formula Enhancements */
+.katex {
+  font-size: 1.05em;
+  text-rendering: auto;
+}
+
+.katex-display {
+  margin: 0.5em 0 !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25em 0;
+}
+
+.katex-block {
+  display: block;
+  text-align: center;
+}
+
+.katex-inline {
+  display: inline-block;
+  padding: 0 0.15em;
+}
+
+/* Rich Card Prose Enhancements */
+.rich-card-prose p {
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.rich-card-prose h1,
+.rich-card-prose h2,
+.rich-card-prose h3,
+.rich-card-prose h4 {
+  font-weight: 700;
+  color: #ffffff;
+  margin-top: 0.6rem;
+  margin-bottom: 0.3rem;
+  line-height: 1.3;
+}
+
+.rich-card-prose h1 { font-size: 1.15rem; }
+.rich-card-prose h2 { font-size: 1rem; }
+.rich-card-prose h3 { font-size: 0.875rem; }
+
+.rich-card-prose ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.rich-card-prose ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.rich-card-prose code {
+  font-family: "SF Mono", Menlo, Monaco, monospace;
+  font-size: 0.85em;
+}
+
+.rich-card-prose pre {
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+.rich-card-prose blockquote {
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
+  padding-left: 0.75rem;
+  margin: 0.5rem 0;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Hide scrollbar for clean UI elements */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Sleek glassmorphic scrollbar for canvas text cards & artifacts */
+.custom-card-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scroll-behavior: smooth;
+}
+
+.custom-card-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-card-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-card-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+
+.custom-card-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Tokyo Night / Modern Dark Prism Syntax Highlighting */
+code[class*="language-"],
+pre[class*="language-"] {
+  color: #c0caf5;
+  font-family: "SF Mono", Menlo, Monaco, monospace;
+  direction: ltr;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  line-height: 1.6;
+  tab-size: 2;
+  hyphens: none;
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #6272a4;
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: #94a3b8;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #ff9e64;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #9ece6a;
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #7dcfff;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #bb9af7;
+  font-weight: 600;
+}
+
+.token.function,
+.token.class-name {
+  color: #7aa2f7;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #f7768e;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MACOS SEQUOIA SIRI / APPLE INTELLIGENCE OBSIDIAN GLASS SYSTEM
+   Minimal, quiet, deep obsidian translucency with 1px specular
+   highlight borders, optical saturation boost, and elevation depth.
+   Authentic Liquid Glass: content layers softly peek through
+   while controls stay crisp and legible.
+   ═══════════════════════════════════════════════════════════ */
+
+/* --- Floating Island Dock (Bottom HUD Primary Controls) --- */
+.liquid-glass-dock {
+  background: linear-gradient(180deg, rgba(18, 18, 24, 0.78) 0%, rgba(24, 24, 32, 0.85) 100%);
+  backdrop-filter: blur(36px) saturate(200%);
+  -webkit-backdrop-filter: blur(36px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Floating Viewport, Pages & Contextual Action Pills --- */
+.liquid-glass-pill {
+  background: rgba(18, 18, 24, 0.82);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Floating Menus, Sheets & Popovers --- */
+.liquid-glass-popover {
+  background: rgba(18, 18, 24, 0.92);
+  backdrop-filter: blur(48px) saturate(180%);
+  -webkit-backdrop-filter: blur(48px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- visionOS Spatial Intelligence Liquid Glass Window --- */
+.liquid-glass-siri {
+  background:
+    radial-gradient(110% 45% at 50% 100%, rgba(28, 32, 44, 0.18) 0%, rgba(18, 20, 28, 0.08) 50%, rgba(12, 13, 17, 0) 85%),
+    linear-gradient(180deg, rgba(12, 13, 16, 0.96) 0%, rgba(14, 16, 21, 0.94) 40%, rgba(17, 19, 25, 0.92) 80%, rgba(20, 22, 30, 0.90) 100%);
+  backdrop-filter: blur(50px) saturate(190%);
+  -webkit-backdrop-filter: blur(50px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 32px 80px -16px rgba(0, 0, 0, 0.85),
+    inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.02),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Card Glass (Canvas Shapes: Code, Rich Notes, Artifacts, Media) --- */
+.liquid-glass-card {
+  background: rgba(18, 18, 24, 0.80);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 20px 50px -10px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.14);
+  transition: border-color 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.liquid-glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.20);
+}
+
+/* --- Card Header Bar --- */
+.liquid-glass-header {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+/* --- Code & Content Inner Surface --- */
+.liquid-glass-code-bg {
+  background: rgba(12, 12, 16, 0.85);
+}
+
+/* --- Elevated Floating Panels (Spatial AI Omnibar, Contextual Popovers) --- */
+.liquid-glass-elevated {
+  background: rgba(20, 20, 28, 0.85);
+  backdrop-filter: blur(36px) saturate(200%);
+  -webkit-backdrop-filter: blur(36px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Tabular Numbers Utility --- */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  -webkit-font-feature-settings: "tnum";
+  font-feature-settings: "tnum";
+}
+
+/* --- Concentric Border Radius Utilities: outer = inner + padding --- */
+.concentric-nested {
+  border-radius: inherit;
+}
+
+/* --- Tactile Micro-Interactions (Apple Scale on Press) --- */
+.tactile-press {
+  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), opacity 0.15s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.tactile-press:active {
+  transform: scale(0.96);
+}
+
+/* Keyboard and accessibility preferences apply to custom chrome as well as canvas tools. */
+button:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-glass-siri, .liquid-glass-dock, .liquid-glass-pill, .liquid-glass-popover { backdrop-filter: none !important; background: #18181f !important; }
+}
