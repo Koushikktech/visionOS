@@ -1,0 +1,34 @@
+[
+  {
+    "engine": "chromium",
+    "missingKeySetup": true,
+    "noSilentSend": true,
+    "invalidKeyExplicitRequest": true,
+    "sampleUndoRedo": true,
+    "themeSourceUnchanged": true,
+    "liveFramesSuspended": true,
+    "compactEditor": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "chromium",
+    "blockedStorageManualEntry": true,
+    "sessionDismissal": true
+  },
+  {
+    "engine": "webkit",
+    "missingKeySetup": true,
+    "noSilentSend": true,
+    "invalidKeyExplicitRequest": true,
+    "sampleUndoRedo": true,
+    "themeSourceUnchanged": true,
+    "liveFramesSuspended": true,
+    "compactEditor": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "webkit",
+    "blockedStorageManualEntry": true,
+    "sessionDismissal": true
+  }
+]

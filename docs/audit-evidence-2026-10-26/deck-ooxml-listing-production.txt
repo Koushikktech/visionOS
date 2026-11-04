@@ -1,0 +1,44 @@
+Archive:  /private/tmp/visionos-webkit-deck.pptx
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+        0  10-26-2026 16:47   _rels/
+        0  10-26-2026 16:47   docProps/
+        0  10-26-2026 16:47   ppt/
+        0  10-26-2026 16:47   ppt/_rels/
+        0  10-26-2026 16:47   ppt/charts/
+        0  10-26-2026 16:47   ppt/charts/_rels/
+        0  10-26-2026 16:47   ppt/embeddings/
+        0  10-26-2026 16:47   ppt/media/
+        0  10-26-2026 16:47   ppt/slideLayouts/
+        0  10-26-2026 16:47   ppt/slideLayouts/_rels/
+        0  10-26-2026 16:47   ppt/slideMasters/
+        0  10-26-2026 16:47   ppt/slideMasters/_rels/
+        0  10-26-2026 16:47   ppt/slides/
+        0  10-26-2026 16:47   ppt/slides/_rels/
+        0  10-26-2026 16:47   ppt/theme/
+        0  10-26-2026 16:47   ppt/notesMasters/
+        0  10-26-2026 16:47   ppt/notesMasters/_rels/
+        0  10-26-2026 16:47   ppt/notesSlides/
+        0  10-26-2026 16:47   ppt/notesSlides/_rels/
+     2463  10-26-2026 16:47   [Content_Types].xml
+      605  10-26-2026 16:47   _rels/.rels
+     1360  10-26-2026 16:47   docProps/app.xml
+      757  10-26-2026 16:47   docProps/core.xml
+     1127  10-26-2026 16:47   ppt/_rels/presentation.xml.rels
+     8335  10-26-2026 16:47   ppt/theme/theme1.xml
+     3265  10-26-2026 16:47   ppt/presentation.xml
+      287  10-26-2026 16:47   ppt/presProps.xml
+      182  10-26-2026 16:47   ppt/tableStyles.xml
+      816  10-26-2026 16:47   ppt/viewProps.xml
+      687  10-26-2026 16:47   ppt/slideLayouts/slideLayout1.xml
+      311  10-26-2026 16:47   ppt/slideLayouts/_rels/slideLayout1.xml.rels
+     5857  10-26-2026 16:47   ppt/slides/slide1.xml
+      462  10-26-2026 16:47   ppt/slides/_rels/slide1.xml.rels
+     1680  10-26-2026 16:47   ppt/notesSlides/notesSlide1.xml
+      459  10-26-2026 16:47   ppt/notesSlides/_rels/notesSlide1.xml.rels
+     7831  10-26-2026 16:47   ppt/slideMasters/slideMaster1.xml
+      446  10-26-2026 16:47   ppt/slideMasters/_rels/slideMaster1.xml.rels
+     7508  10-26-2026 16:47   ppt/notesMasters/notesMaster1.xml
+      298  10-26-2026 16:47   ppt/notesMasters/_rels/notesMaster1.xml.rels
+---------                     -------
+    44736                     39 files

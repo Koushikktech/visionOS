@@ -1,0 +1,57 @@
+[
+  {
+    "check": "Legacy fake/OAuth tokens removed; genuine API key preserved in both stores",
+    "pass": true
+  },
+  {
+    "check": "Pasting a fabricated token cannot replace a valid API key",
+    "pass": true
+  },
+  {
+    "check": "API-key setup viewport bounds",
+    "pass": true,
+    "sizes": [
+      "320x568",
+      "768x1024",
+      "1024x500"
+    ]
+  },
+  {
+    "check": "Draft does not auto-send; explicit request uses API key only",
+    "pass": true
+  },
+  {
+    "check": "Actual AI panel compact/default/expanded bounds and input access",
+    "pass": true,
+    "sizes": [
+      "320x568",
+      "768x1024",
+      "1024x500",
+      "1440x900"
+    ]
+  },
+  {
+    "check": "Saving provider settings does not send another request",
+    "pass": true
+  },
+  {
+    "check": "/api/auth/openai/token removed",
+    "pass": true
+  },
+  {
+    "check": "/api/ai/openai-check removed",
+    "pass": true
+  },
+  {
+    "check": "Unsafe OAuth callback removed",
+    "pass": true
+  },
+  {
+    "check": "No uncaught browser errors",
+    "pass": true
+  },
+  {
+    "check": "Missing-key setup preserves first draft; Save never sends",
+    "pass": true
+  }
+]

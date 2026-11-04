@@ -1,0 +1,2 @@
+chromium: document recovery committed; normal autosave remained silent
+webkit: document recovery committed; normal autosave remained silent

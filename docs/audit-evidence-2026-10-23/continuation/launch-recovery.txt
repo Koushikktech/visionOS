@@ -1,0 +1,2 @@
+Failed canvas chunk shows recovery UI
+Reload recovered after transport restored; browser settings and saved shape retained 1

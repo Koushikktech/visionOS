@@ -8,7 +8,10 @@ import {
 import {
   guardRequest,
   providerSignal,
+  readBoundedJson,
+  RequestBodyTooLargeError,
   validateChatRequest,
+  validateProviderHeaders,
 } from '@/lib/ai/request';
 import { SWARM_PLANNER_PROMPT } from '@/lib/ai/prompts';
 import { buildSpatialContextText } from '@/lib/ai/prompt';
@@ -23,12 +26,14 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
   let body: AISpatialChatRequest;
   try {
-    body = await req.json();
-    validateChatRequest(body);
+    const parsed = await readBoundedJson(req);
+    validateChatRequest(parsed);
+    validateProviderHeaders(req, parsed.provider || 'gemini');
+    body = parsed;
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : 'Invalid request.' },
-      { status: 400 }
+      { status: error instanceof RequestBodyTooLargeError ? 413 : 400 }
     );
   }
   const provider = body.provider || 'gemini';
@@ -111,7 +116,7 @@ export async function POST(req: NextRequest) {
               };
         response = await fetch(
           provider === 'gemini'
-            ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:generateContent?key=${encodeURIComponent(key)}`
+          ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:generateContent`
             : 'https://openrouter.ai/api/v1/chat/completions',
           {
             method: 'POST',
@@ -143,13 +148,30 @@ export async function POST(req: NextRequest) {
         `Swarm planning failed (${response?.status || 502}). Check the provider settings or retry.`
       );
     const data = await response.json();
+    const geminiCandidate = data.candidates?.[0];
+    const openRouterChoice = data.choices?.[0];
+    if (provider === 'gemini') {
+      if (geminiCandidate?.finishReason === 'MAX_TOKENS')
+        throw new Error('Swarm planner output was truncated. Please retry.');
+      if (geminiCandidate?.finishReason !== 'STOP')
+        throw new Error(
+          'Swarm planning ended without a successful completion signal. Please retry.'
+        );
+    } else {
+      if (openRouterChoice?.finish_reason === 'length')
+        throw new Error('Swarm planner output was truncated. Please retry.');
+      if (openRouterChoice?.finish_reason !== 'stop')
+        throw new Error(
+          'Swarm planning ended without a successful completion signal. Please retry.'
+        );
+    }
     const raw =
       provider === 'gemini'
-        ? data.candidates?.[0]?.content?.parts
+        ? geminiCandidate?.content?.parts
             ?.filter((p: any) => p.text && !p.thought)
             .map((p: any) => p.text)
             .join('')
-        : data.choices?.[0]?.message?.content;
+        : openRouterChoice?.message?.content;
     plan = JSON.parse(
       String(raw || '')
         .replace(/^```(?:json)?\s*/i, '')

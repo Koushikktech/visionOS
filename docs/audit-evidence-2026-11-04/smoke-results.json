@@ -1,0 +1,48 @@
+[
+  {
+    "check": "Studio loads without forced modal",
+    "pass": true
+  },
+  {
+    "check": "Public test-subscription control persists fabricated live credential",
+    "observed": true,
+    "provider": "openai",
+    "plan": "ChatGPT Plus (Subscription Quota)"
+  },
+  {
+    "check": "Provider dialog bounds 320x568",
+    "pass": true,
+    "rootOverflow": false
+  },
+  {
+    "check": "Provider dialog bounds 768x1024",
+    "pass": true,
+    "rootOverflow": false
+  },
+  {
+    "check": "Provider dialog bounds 1024x500",
+    "pass": true,
+    "rootOverflow": false
+  },
+  {
+    "check": "Sample opens canvas",
+    "pass": true
+  },
+  {
+    "check": "Returning Studio suspends app iframes",
+    "pass": true
+  },
+  {
+    "check": "Uncaught browser errors in smoke flow",
+    "errorCounts": {
+      "Failed to fetch": 2,
+      "The source image cannot be decoded.": 358
+    }
+  },
+  {
+    "check": "OAuth callback with mismatched state",
+    "exchangeCalls": 1,
+    "persistedConnected": true,
+    "note": "Token endpoint mocked; no real provider contacted"
+  }
+]

@@ -1,0 +1,128 @@
+ M .env.example
+ M README.md
+ M bun.lock
+ M next.config.mjs
+ M package.json
+ M src/app/api/ai/chat/route.ts
+ M src/app/api/ai/make-real/route.test.ts
+ M src/app/api/ai/make-real/route.ts
+ M src/app/api/ai/spatial-stream/route.ts
+ M src/app/api/ai/swarm/route.ts
+ M src/app/globals.css
+ M src/app/page.tsx
+ M src/components/AIAgentCursor.tsx
+ M src/components/AppleFloatingDock.tsx
+ M src/components/ApplePagesPill.tsx
+ M src/components/AppleViewportPill.tsx
+ M src/components/Canvas.tsx
+ M src/components/ContextualFormattingPill.tsx
+ M src/components/SpatialAIOmnibar.tsx
+ M src/components/SpeculativeSkeletonOverlay.tsx
+ M src/components/VisionOnboardingModal.tsx
+ M src/hooks/useSpatialAI.ts
+ M src/hooks/useSpatialWorker.ts
+ M src/lib/ai/actions.ts
+ M src/lib/ai/prompt.test.ts
+ M src/lib/ai/prompt.ts
+ M src/lib/ai/prompts.ts
+ M src/lib/ai/provider.ts
+ M src/lib/ai/request.ts
+ M src/lib/artifactStorage.ts
+ M src/lib/spatialContext.ts
+ M src/shapes/ArtifactShapeUtil.tsx
+ M src/shapes/CodeCardShapeUtil.tsx
+ M src/shapes/DocShapeUtil.tsx
+ M src/shapes/MediaEmbedShapeUtil.tsx
+ M src/shapes/RichCardShapeUtil.tsx
+ M src/shapes/SlideDeckShapeUtil.tsx
+ M src/test/adversarial_geometry_constraints.test.ts
+ M src/test/artifactSanitizer.test.ts
+ M src/test/geometrySizingChallenge.test.ts
+ M src/test/hud.test.ts
+ M src/test/mvpProtocol.test.ts
+ M src/test/omnibar.test.ts
+ M src/test/routes.test.ts
+ M src/test/workerProtocol.test.ts
+ M src/types/spatial.ts
+ M src/workers/spatial.worker.ts
+?? THIRD_PARTY_NOTICES/
+?? docs/PRODUCTION_AUDIT_PLAN.md
+?? docs/audit-evidence-2026-10-22/
+?? docs/audit-evidence-2026-10-23/
+?? docs/audit-evidence-2026-10-26/
+?? docs/audit-evidence-2026-10-27/
+?? docs/redesign/
+?? docs/visionos_feature_inventory_and_roadmap.md
+?? src/app/api/ai/chat/route.test.ts
+?? src/app/api/ai/openai-check/
+?? src/app/error.tsx
+?? src/app/global-error.tsx
+?? src/app/loading.tsx
+?? src/components/ArtifactNetworkPermissionsDialog.tsx
+?? src/components/BoardRecoveryNotice.tsx
+?? src/components/LaunchRecoveryScreen.tsx
+?? src/components/ShapeFocusLayer.tsx
+?? src/components/VisionDashboard.tsx
+?? src/hooks/useBoardRecovery.ts
+?? src/hooks/useDialogFocus.ts
+?? src/hooks/useShapeDraft.test.ts
+?? src/hooks/useShapeDraft.ts
+?? src/hooks/useVisibleViewport.ts
+?? src/hooks/viewportGeometry.test.ts
+?? src/hooks/viewportGeometry.ts
+?? src/lib/ai/actions.test.ts
+?? src/lib/ai/chatgptOAuth.ts
+?? src/lib/ai/keyStorage.test.ts
+?? src/lib/ai/keyStorage.ts
+?? src/lib/ai/provider.test.ts
+?? src/lib/ai/request.test.ts
+?? src/lib/artifactFrameBoundary.test.ts
+?? src/lib/artifactFrameBoundary.ts
+?? src/lib/artifactNetworkPermissions.test.ts
+?? src/lib/artifactNetworkPermissions.ts
+?? src/lib/artifactNetworkPolicy.test.ts
+?? src/lib/artifactNetworkPolicy.ts
+?? src/lib/artifactRuntime.test.ts
+?? src/lib/artifactRuntime.ts
+?? src/lib/artifactStorage.test.ts
+?? src/lib/artifactStorageAcknowledgement.test.ts
+?? src/lib/artifactStorageAcknowledgement.ts
+?? src/lib/artifactStorageHydration.test.ts
+?? src/lib/artifactStorageHydration.ts
+?? src/lib/artifactStoragePersistence.test.ts
+?? src/lib/artifactStoragePersistence.ts
+?? src/lib/boardRecoveryPersistence.test.ts
+?? src/lib/boardRecoveryPersistence.ts
+?? src/lib/browserStorage.test.ts
+?? src/lib/browserStorage.ts
+?? src/lib/canvasGesturePolicy.test.ts
+?? src/lib/canvasGesturePolicy.ts
+?? src/lib/canvasRecoverySummary.test.ts
+?? src/lib/canvasRecoverySummary.ts
+?? src/lib/canvasRecoveryViewport.test.ts
+?? src/lib/canvasRecoveryViewport.ts
+?? src/lib/canvasWriteGuard.test.ts
+?? src/lib/canvasWriteGuard.ts
+?? src/lib/contentEditing.test.ts
+?? src/lib/contentEditing.ts
+?? src/lib/deckPptxExport.test.ts
+?? src/lib/deckPptxExport.ts
+?? src/lib/editorOperation.ts
+?? src/lib/launchRecovery.test.ts
+?? src/lib/launchRecovery.ts
+?? src/lib/mediaEmbed.test.ts
+?? src/lib/mediaEmbed.ts
+?? src/lib/pointerIntent.test.ts
+?? src/lib/pointerIntent.ts
+?? src/lib/selectionCapabilities.test.ts
+?? src/lib/selectionCapabilities.ts
+?? src/lib/shapeContentSchema.ts
+?? src/lib/shapeEditing.ts
+?? src/lib/spatialContext.test.ts
+?? src/lib/spatialSourceContract.test.ts
+?? src/lib/spatialSourceContract.ts
+?? src/lib/workspaceBackup.test.ts
+?? src/lib/workspaceBackup.ts
+?? src/test/clipboard.test.ts
+?? src/test/dashboardAndChatGPT.test.ts
+?? src/test/overlayViewport.test.ts

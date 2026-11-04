@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { DefaultColorStyle } from '@tldraw/tldraw';
+import { getVisibleViewport } from '../hooks/useVisibleViewport';
+import { getFloatingViewportBounds, placeFloatingPopover } from '../hooks/viewportGeometry';
 
 /**
  * Authoritative Floating Island Dock 10 Tools Specification
@@ -348,29 +350,56 @@ describe('HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts)', () => {
       expect(styles[DefaultColorStyle.id]).toBe('light-blue');
     });
 
-    it('verifies ContextualFormattingPill contains air-gap clearance, popover offset, and text editing suppression', () => {
+    it('verifies ContextualFormattingPill popover geometry, air gap, and text editing suppression', () => {
       const fs = require('fs');
       const path = require('path');
       const code = fs.readFileSync(path.join(process.cwd(), 'src/components/ContextualFormattingPill.tsx'), 'utf8');
 
       // 1. In-situ text editing suppression
       expect(code).toContain('editor.getEditingShapeId() !== null');
+      expect(code).toContain('FloatingPopoverPortal');
 
-      // 2. Strict 10px popover air gap
-      expect(code).toContain("top-[calc(100%+10px)]'");
-      expect(code).toContain("bottom-[calc(100%+10px)]'");
+      // Portaled menus keep a measured 10px gap above or below the trigger.
+      const viewport = getVisibleViewport(
+        { innerWidth: 400, innerHeight: 600 },
+        { top: 8, right: 12, bottom: 16, left: 10 }
+      );
+      const centeredMenu = { width: 184, height: 100 };
+      const upperTrigger = { left: 180, top: 300, right: 220, bottom: 340 };
+      const above = placeFloatingPopover(upperTrigger, centeredMenu, viewport);
+      expect(above.placement).toBe('top');
+      expect(upperTrigger.top - above.top - centeredMenu.height).toBe(10);
+      expect(above.left + centeredMenu.width / 2).toBe(200);
 
-      // 3. Popover centering to prevent clipping
-      expect(code).toContain('left-1/2 -translate-x-1/2');
+      const lowerTrigger = { left: 180, top: 20, right: 220, bottom: 60 };
+      const below = placeFloatingPopover(lowerTrigger, centeredMenu, viewport);
+      expect(below.placement).toBe('bottom');
+      expect(below.top - lowerTrigger.bottom).toBe(10);
 
-      // 4. Fill style scoped to geo shapes only
-      expect(code).toContain('const supportsFill = selectedShapes.some((s) => s.type === \'geo\');');
-      expect(code).toContain('{supportsFill && (');
+      // Offscreen triggers clamp the real measured menu to the safe viewport bounds.
+      const bounds = getFloatingViewportBounds(viewport);
+      const clamped = placeFloatingPopover(
+        { left: 900, top: 580, right: 940, bottom: 620 },
+        centeredMenu,
+        viewport
+      );
+      expect(clamped.left).toBeGreaterThanOrEqual(bounds.left);
+      expect(clamped.left + centeredMenu.width).toBeLessThanOrEqual(bounds.right);
+      expect(clamped.top).toBeGreaterThanOrEqual(bounds.top);
+      expect(clamped.top + centeredMenu.height).toBeLessThanOrEqual(bounds.bottom);
+
+      // Native styles are exposed only when the selected-shape utilities support them.
+      expect(code).toContain('resolveStyleTargets<TLShape, S>');
+      expect(code).toContain('supportsStyle: (shape, candidate) =>');
+      expect(code).toContain('Boolean(editor.styleProps[shape.type]?.has(candidate as never))');
+      expect(code).toContain('{fillTargets.targets.length > 0 && (');
 
       // 5. Make Real scoped to drawings/sketches
       expect(code).toContain('const canMakeReal = hasDrawings || isMultiShapeSketch;');
 
-      // 6. Swatch active ring on inner dot without button-level clipping
+      // Swatches expose their accessible group/name and retain a visible selected state.
+      expect(code).toContain('role="group" aria-label="Native color swatches"');
+      expect(code).toContain('aria-label={swatch.label}');
       expect(code).toContain('ring-white/90 ring-offset-2 ring-offset-[#121218]');
     });
   });

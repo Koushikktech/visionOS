@@ -38,3 +38,6 @@ Thumbs.db
 .agents/
 skills-lock.json
 *.bak
+
+# Isolated local UI review builds
+/.next-review/

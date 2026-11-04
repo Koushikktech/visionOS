@@ -1,0 +1,8 @@
+2 tests failed:
+(fail) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Concentric Border Radii: outer = inner + padding > verifies SpatialAIOmnibar uses a bounded desktop panel and an inset compact sheet [4.16ms]
+(fail) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric radius token declarations in source components [0.49ms]
+
+ 468 pass
+ 2 fail
+ 1152863 expect() calls
+Ran 470 tests across 51 files. [3.50s]

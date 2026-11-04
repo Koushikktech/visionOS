@@ -1,0 +1,6 @@
+[ { c: 'studio-header__nav', r: 394.75, w: 140 } ]
+AssertionError [ERR_ASSERTION]: 200% text narrow reflow
+
+true !== false
+
+    at /Users/koushikk/Documents/projects/visionOS/docs/redesign/glass-evidence/studio-deep-browser.cjs:5:1653

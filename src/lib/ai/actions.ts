@@ -12,6 +12,8 @@ const operations = new Set([
   'draw_vector',
   'create_document',
   'mutate_document',
+  'create_slide_deck',
+  'mutate_slide_deck',
   'mutate_artifact',
   'mutate_rich_card',
   'mutate_code_card',
@@ -43,6 +45,61 @@ const colors = new Set([
   'red',
   'white',
 ]);
+const deckThemes = new Set(['midnight', 'paper', 'ocean', 'plum']);
+const deckLayouts = new Set(['hero', 'split', 'columns', 'stats', 'timeline', 'takeaway']);
+
+function assertDeckSlides(value: unknown, label: string) {
+  if (!Array.isArray(value) || value.length > 100)
+    throw new Error(`${label} must contain at most 100 slides.`);
+  const ids = new Set<string>();
+  let total = 0;
+  const boundedString = (item: unknown, max: number, name: string, required = false) => {
+    if (item === undefined && !required) return;
+    if (typeof item !== 'string' || item.length > max || (required && !item.trim()))
+      throw new Error(`Invalid ${name}.`);
+  };
+  for (const [index, candidate] of value.entries()) {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate))
+      throw new Error(`Invalid ${label} slide.`);
+    const slide = candidate as Record<string, unknown>;
+    const allowed = new Set(['id', 'title', 'subtitle', 'layout', 'bullets', 'content', 'speakerNotes', 'stats', 'columns', 'timelineSteps']);
+    if (Object.keys(slide).some((key) => !allowed.has(key)))
+      throw new Error(`Unsupported field in ${label} slide ${index + 1}.`);
+    boundedString(slide.id, 1_024, `${label} slide ID`, true);
+    boundedString(slide.title, 4_000, `${label} slide title`, true);
+    if (ids.has(slide.id as string)) throw new Error(`${label} slide IDs must be unique.`);
+    ids.add(slide.id as string);
+    boundedString(slide.subtitle, 4_000, `${label} slide subtitle`);
+    boundedString(slide.content, 30_000, `${label} slide content`);
+    boundedString(slide.speakerNotes, 10_000, `${label} speaker notes`);
+    if (slide.layout !== undefined && (typeof slide.layout !== 'string' || !deckLayouts.has(slide.layout)))
+      throw new Error(`Invalid ${label} slide layout.`);
+    if (slide.bullets !== undefined && (!Array.isArray(slide.bullets) || slide.bullets.length > 100 || !slide.bullets.every((item) => typeof item === 'string' && item.length <= 4_000)))
+      throw new Error(`Invalid ${label} slide bullets.`);
+    for (const [field, maxItems, shape] of [
+      ['stats', 50, { required: ['label', 'value'], optional: ['change'], max: 4_000 }],
+      ['columns', 20, { required: ['title', 'text'], optional: ['icon'], max: 4_000 }],
+      ['timelineSteps', 50, { required: ['step', 'title', 'desc'], optional: [], max: 4_000 }],
+    ] as const) {
+      const entries = slide[field];
+      if (entries === undefined) continue;
+      if (!Array.isArray(entries) || entries.length > maxItems)
+        throw new Error(`Invalid ${label} slide ${field}.`);
+      for (const entry of entries) {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+          throw new Error(`Invalid ${label} slide ${field} item.`);
+        const record = entry as Record<string, unknown>;
+        const keys = new Set<string>([...shape.required, ...shape.optional]);
+        if (Object.keys(record).some((key) => !keys.has(key)))
+          throw new Error(`Unsupported field in ${label} slide ${field} item.`);
+        for (const key of shape.required) boundedString(record[key], key === 'step' ? 256 : shape.max, `${label} ${field}.${key}`, true);
+        for (const key of shape.optional) boundedString(record[key], key === 'icon' ? 128 : shape.max, `${label} ${field}.${key}`);
+      }
+    }
+    total += JSON.stringify(slide).length;
+  }
+  if (total > 180_000) throw new Error(`${label} exceeds the content limit.`);
+}
 export const shapeId = (id: string) =>
   id.startsWith('shape:') ? id : `shape:${id}`;
 
@@ -87,6 +144,9 @@ export function validateAction(value: unknown): SpatialActionFrame {
     'author',
     'date',
     'sections',
+    'theme',
+    'currentSlideIndex',
+    'slides',
     'nodeIds',
     'bend',
     'w',
@@ -110,6 +170,7 @@ export function validateAction(value: unknown): SpatialActionFrame {
         'subtitle',
         'author',
         'date',
+        'theme',
         'svgPath',
         'relative',
       ].includes(key) &&
@@ -221,6 +282,24 @@ export function validateAction(value: unknown): SpatialActionFrame {
       ))
   )
     throw new Error('Invalid document sections.');
+  if (f.op === 'create_slide_deck' || f.op === 'mutate_slide_deck') {
+    if (f.slides === undefined) throw new Error(`${f.op} needs the complete slide list.`);
+    assertDeckSlides(f.slides, 'Deck');
+    if (f.title !== undefined && (typeof f.title !== 'string' || f.title.length > 4_000))
+      throw new Error('Deck title is too long.');
+    if (f.subtitle !== undefined && (typeof f.subtitle !== 'string' || f.subtitle.length > 4_000))
+      throw new Error('Deck subtitle is too long.');
+    if (f.op === 'create_slide_deck' && f.slides.length === 0)
+      throw new Error('A new deck needs at least one slide.');
+    if (f.op === 'create_slide_deck' && !f.id)
+      throw new Error('Creating a slide deck needs a new ID.');
+    if (f.theme !== undefined && (typeof f.theme !== 'string' || !deckThemes.has(f.theme)))
+      throw new Error('Unsupported deck theme.');
+    if (f.currentSlideIndex !== undefined && (!Number.isInteger(f.currentSlideIndex) || f.currentSlideIndex < 0 || f.currentSlideIndex >= Math.max(f.slides.length, 1)))
+      throw new Error('Invalid active slide index.');
+  } else if (f.theme !== undefined || f.currentSlideIndex !== undefined || f.slides !== undefined) {
+    throw new Error('Deck fields are only valid for deck actions.');
+  }
   if (
     f.storage !== undefined &&
     (!f.storage ||

@@ -1,0 +1,16 @@
+[
+  {
+    "engine": "Chromium",
+    "livePartialLoadRollback": true,
+    "canvasUsableAfterFailure": true,
+    "reloadPreservedOriginalAndLaterEdit": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "WebKit",
+    "livePartialLoadRollback": true,
+    "canvasUsableAfterFailure": true,
+    "reloadPreservedOriginalAndLaterEdit": true,
+    "pageErrors": []
+  }
+]

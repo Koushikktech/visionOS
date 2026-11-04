@@ -1,0 +1,13 @@
+ASSET EXPORT [
+  {
+    type: 'image',
+    src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA'
+  }
+] {
+  embeddedAssetCount: 1,
+  excludedAssets: [],
+  exclusions: [
+    'AI chat history, provider keys, and application preferences are not included. App virtual storage is included in the workspace snapshot.'
+  ]
+}
+Fresh profile image restored

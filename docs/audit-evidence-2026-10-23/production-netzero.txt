@@ -1,0 +1,8 @@
+paused frames 0
+frames after run 1
+frame body before net-zero burst Count: 3
+
+Increment stored count
+PENDING STATUS SHOWN FOR NET-ZERO BURST
+NET-ZERO COMMITTED ACTIVE ROW {"epoch":1,"savedAt":1792774246984,"storage":{"count":"3","fixture":"test"}}
+NET-ZERO STATUS SETTLED AFTER DURABLE ACK

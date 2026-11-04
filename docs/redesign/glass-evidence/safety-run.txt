@@ -1,0 +1,5 @@
+locator.fill: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByRole('textbox', { name: 'OpenAI API key', exact: true })[22m
+
+    at /Users/koushikk/Documents/projects/visionOS/docs/redesign/glass-evidence/studio-safety-browser.cjs:10:484

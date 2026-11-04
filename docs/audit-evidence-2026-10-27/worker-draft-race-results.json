@@ -1,0 +1,20 @@
+[
+  {
+    "engine": "Chromium",
+    "dirtyDraftDuringWorkerSolveProtected": true,
+    "draftPreserved": true,
+    "workerIndexRebased": true,
+    "nextMutationSucceeded": true,
+    "readonlyDuringSolveProtected": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "WebKit",
+    "dirtyDraftDuringWorkerSolveProtected": true,
+    "draftPreserved": true,
+    "workerIndexRebased": true,
+    "nextMutationSucceeded": true,
+    "readonlyDuringSolveProtected": true,
+    "pageErrors": []
+  }
+]

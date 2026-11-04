@@ -9,6 +9,7 @@ import type {
   AISpatialChatRequest,
   SpatialActionFrame,
   SolvedActionPayload,
+  SpatialNodeItem,
 } from '../types/spatial';
 import type { useSpatialWorker } from './useSpatialWorker';
 import {
@@ -17,8 +18,29 @@ import {
   calculateMakeRealPlacement,
   type GroundedSpatialContext,
 } from '../lib/spatialVision';
-import { isCanvasActionIntent } from '../lib/ai/prompt';
+import {
+  isCanvasActionIntent,
+  isExplicitCanvasMutationCommand,
+} from '../lib/ai/prompt';
 import { validateAction, assertCompleteHtml, shapeId } from '../lib/ai/actions';
+import { compactViewportNeighbor, serializeCanvas } from '../lib/spatialContext';
+import { assertCanvasWritable, assertSpatialActionsWritable } from '../lib/canvasWriteGuard';
+import {
+  readLocalStorage,
+  writeLocalStorage,
+} from '../lib/browserStorage';
+import {
+  type KeyPersistenceStatus,
+  type KeyProvider,
+  persistProviderKeys,
+  readProviderKeys,
+  readProviderSetupPreferences,
+  filterProviderKeys,
+} from '../lib/ai/keyStorage';
+
+function persistPreferenceAliases(names: string[], value: string): void {
+  for (const name of names) writeLocalStorage(name, value);
+}
 
 function cleanHeaderValue(val?: string | null): string {
   if (!val) return '';
@@ -139,14 +161,22 @@ export function useSpatialAI(
   editor: Editor | null,
   spatial: ReturnType<typeof useSpatialWorker>
 ) {
-  const [provider, setProviderState] = useState<'gemini' | 'openrouter'>(
+  const [provider, setProviderState] = useState<'gemini' | 'openrouter' | 'openai'>(
     'gemini'
   );
   const [geminiApiKeys, setGeminiApiKeysState] = useState<string[]>([]);
   const [openRouterApiKeys, setOpenRouterApiKeysState] = useState<string[]>([]);
+  const [openAiApiKeys, setOpenAiApiKeysState] = useState<string[]>([]);
+  const geminiApiKeysRef = useRef<string[]>([]);
+  const openRouterApiKeysRef = useRef<string[]>([]);
+  const openAiApiKeysRef = useRef<string[]>([]);
+  const [keyPersistenceByProvider, setKeyPersistenceByProvider] = useState<
+    Record<KeyProvider, KeyPersistenceStatus>
+  >({ gemini: 'persistent', openrouter: 'persistent', openai: 'persistent' });
   const [geminiModel, setGeminiModelState] = useState<string>('gemini-3.8-flash');
   const [openRouterModel, setOpenRouterModelState] =
     useState<string>('openai/gpt-4o');
+  const [openAiModel, setOpenAiModelState] = useState<string>('gpt-4o');
 
   // Thinking & Swarm Settings
   const [thinkingMode, setThinkingModeState] = useState<boolean>(true);
@@ -162,6 +192,24 @@ export function useSpatialAI(
       timestamp: Date.now(),
     },
   ]);
+  const reportReadonlyAction = useCallback((prompt: string) => {
+    const timestamp = Date.now();
+    setMessages((prev) => [
+      ...prev.slice(-58),
+      {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: prompt,
+        timestamp,
+      },
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'This canvas is read-only. I can answer questions, but cannot make canvas changes.',
+        timestamp,
+      },
+    ]);
+  }, []);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [agentPresence, setAgentPresence] = useState<AgentPresenceState>({
@@ -192,68 +240,43 @@ export function useSpatialAI(
   // Load preferences on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedProvider = (localStorage.getItem('visionos_ai_provider') ||
-        localStorage.getItem('canvasos_ai_provider')) as
+      const readLocal = (name: string) => {
+        return readLocalStorage(name).value;
+      };
+
+      const setupPreferences = readProviderSetupPreferences();
+      const savedProvider = setupPreferences.provider as
         | 'gemini'
         | 'openrouter'
+        | 'openai'
         | null;
-      if (savedProvider === 'gemini' || savedProvider === 'openrouter') {
+      if (savedProvider === 'gemini' || savedProvider === 'openrouter' || savedProvider === 'openai') {
         setProviderState(savedProvider);
       }
 
-      // Preserve the existing saved-key behavior.
-      for (const name of [
-        'visionos_gemini_api_keys',
-        'visionos_gemini_api_key',
-        'visionos_openrouter_api_keys',
-        'visionos_openrouter_api_key',
-        'canvasos_gemini_api_keys',
-        'canvasos_gemini_api_key',
-        'canvasos_openrouter_api_keys',
-        'canvasos_openrouter_api_key',
-      ]) {
-        if (!localStorage.getItem(name)) {
-          const temporary = sessionStorage.getItem(name);
-          if (temporary) localStorage.setItem(name, temporary);
-        }
-      }
-      // Load saved provider keys (with fallback to legacy canvasos keys)
-      const savedGeminiKeysJson =
-        localStorage.getItem('visionos_gemini_api_keys') ||
-        localStorage.getItem('canvasos_gemini_api_keys');
-      if (savedGeminiKeysJson) {
-        const parsed = parseKeysList(savedGeminiKeysJson);
-        if (parsed.length > 0) setGeminiApiKeysState(parsed);
-      } else {
-        const legacyGeminiKey =
-          localStorage.getItem('visionos_gemini_api_key') ||
-          localStorage.getItem('canvasos_gemini_api_key');
-        if (legacyGeminiKey) {
-          const parsed = parseKeysList(legacyGeminiKey);
-          if (parsed.length > 0) setGeminiApiKeysState(parsed);
-        }
-      }
+      const restoredGemini = readProviderKeys('gemini');
+      const restoredGeminiKeys = restoredGemini.keys;
+      geminiApiKeysRef.current = restoredGeminiKeys;
+      setGeminiApiKeysState(restoredGeminiKeys);
 
-      // Load OpenRouter keys (with fallback to legacy canvasos keys)
-      const savedOpenRouterKeysJson =
-        localStorage.getItem('visionos_openrouter_api_keys') ||
-        localStorage.getItem('canvasos_openrouter_api_keys');
-      if (savedOpenRouterKeysJson) {
-        const parsed = parseKeysList(savedOpenRouterKeysJson);
-        if (parsed.length > 0) setOpenRouterApiKeysState(parsed);
-      } else {
-        const legacyOpenRouterKey =
-          localStorage.getItem('visionos_openrouter_api_key') ||
-          localStorage.getItem('canvasos_openrouter_api_key');
-        if (legacyOpenRouterKey) {
-          const parsed = parseKeysList(legacyOpenRouterKey);
-          if (parsed.length > 0) setOpenRouterApiKeysState(parsed);
-        }
-      }
+      const restoredOpenRouter = readProviderKeys('openrouter');
+      const restoredOpenRouterKeys = restoredOpenRouter.keys;
+      openRouterApiKeysRef.current = restoredOpenRouterKeys;
+      setOpenRouterApiKeysState(restoredOpenRouterKeys);
+
+      const restoredOpenAi = readProviderKeys('openai');
+      const restoredOpenAiKeys = restoredOpenAi.keys;
+      openAiApiKeysRef.current = restoredOpenAiKeys;
+      setOpenAiApiKeysState(restoredOpenAiKeys);
+
+      setKeyPersistenceByProvider({
+        gemini: restoredGemini.status,
+        openrouter: restoredOpenRouter.status,
+        openai: restoredOpenAi.status,
+      });
 
       const savedGeminiModel =
-        localStorage.getItem('visionos_gemini_model') ||
-        localStorage.getItem('canvasos_gemini_model');
+        setupPreferences.models.gemini;
       if (
         savedGeminiModel &&
         savedGeminiModel !== 'gemini' &&
@@ -264,123 +287,137 @@ export function useSpatialAI(
         setGeminiModelState('gemini-3.8-flash');
       }
 
+      const savedOpenAiModel =
+        setupPreferences.models.openai;
+      if (savedOpenAiModel) setOpenAiModelState(savedOpenAiModel);
+
       const savedOpenRouterModel =
-        localStorage.getItem('visionos_openrouter_model') ||
-        localStorage.getItem('canvasos_openrouter_model');
+        setupPreferences.models.openrouter;
       if (savedOpenRouterModel) setOpenRouterModelState(savedOpenRouterModel);
 
       const savedThinking =
-        localStorage.getItem('visionos_thinking_mode') ??
-        localStorage.getItem('canvasos_thinking_mode');
+        readLocal('visionos_thinking_mode') ??
+        readLocal('canvasos_thinking_mode');
       if (savedThinking !== null)
         setThinkingModeState(savedThinking === 'true');
 
       const savedSwarm =
-        localStorage.getItem('visionos_swarm_mode') ??
-        localStorage.getItem('canvasos_swarm_mode');
+        readLocal('visionos_swarm_mode') ??
+        readLocal('canvasos_swarm_mode');
       if (savedSwarm !== null) setSwarmModeState(savedSwarm === 'true');
 
       const savedTemp =
-        localStorage.getItem('visionos_temperature') ??
-        localStorage.getItem('canvasos_temperature');
+        readLocal('visionos_temperature') ??
+        readLocal('canvasos_temperature');
       if (savedTemp) setTemperatureState(Number(savedTemp));
     }
   }, []);
 
-  const setProvider = useCallback((newProvider: 'gemini' | 'openrouter') => {
+  // Shared setup hands off credentials locally, including when browser storage is blocked.
+  // Refresh state without issuing a request or re-persisting a removed key.
+  useEffect(() => {
+    const refresh = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (!detail || !['gemini', 'openrouter', 'openai'].includes(detail.provider)) return;
+      const provider = detail.provider as KeyProvider;
+      const restored = readProviderKeys(provider);
+      const keys = Array.isArray(detail.keys)
+        ? filterProviderKeys(provider, detail.keys.filter((key: unknown): key is string => typeof key === 'string'))
+        : restored.keys;
+      if (provider === 'gemini') {
+        geminiApiKeysRef.current = keys;
+        setGeminiApiKeysState(keys);
+        if (typeof detail.model === 'string') setGeminiModelState(detail.model);
+      } else if (provider === 'openrouter') {
+        openRouterApiKeysRef.current = keys;
+        setOpenRouterApiKeysState(keys);
+        if (typeof detail.model === 'string') setOpenRouterModelState(detail.model);
+      } else {
+        openAiApiKeysRef.current = keys;
+        setOpenAiApiKeysState(keys);
+        if (typeof detail.model === 'string') setOpenAiModelState(detail.model);
+      }
+      setProviderState(provider);
+      setKeyPersistenceByProvider((previous) => ({ ...previous, [provider]: detail.persistenceStatus ?? restored.status }));
+    };
+    window.addEventListener('visionos:provider-saved', refresh);
+    return () => window.removeEventListener('visionos:provider-saved', refresh);
+  }, []);
+
+  const setProvider = useCallback((newProvider: 'gemini' | 'openrouter' | 'openai') => {
     setProviderState(newProvider);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visionos_ai_provider', newProvider);
-      localStorage.setItem('canvasos_ai_provider', newProvider);
-    }
+    persistPreferenceAliases(
+      ['visionos_ai_provider', 'canvasos_ai_provider'],
+      newProvider
+    );
   }, []);
 
   const setThinkingMode = useCallback((val: boolean) => {
     setThinkingModeState(val);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visionos_thinking_mode', String(val));
-      localStorage.setItem('canvasos_thinking_mode', String(val));
-    }
+    persistPreferenceAliases(
+      ['visionos_thinking_mode', 'canvasos_thinking_mode'],
+      String(val)
+    );
   }, []);
 
   const setSwarmMode = useCallback((val: boolean) => {
     setSwarmModeState(val);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visionos_swarm_mode', String(val));
-      localStorage.setItem('canvasos_swarm_mode', String(val));
-    }
+    persistPreferenceAliases(
+      ['visionos_swarm_mode', 'canvasos_swarm_mode'],
+      String(val)
+    );
   }, []);
 
   const setTemperature = useCallback((val: number) => {
     setTemperatureState(val);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visionos_temperature', String(val));
-      localStorage.setItem('canvasos_temperature', String(val));
-    }
+    persistPreferenceAliases(
+      ['visionos_temperature', 'canvasos_temperature'],
+      String(val)
+    );
+  }, []);
+
+  const persistKeysAndSetStatus = useCallback((provider: KeyProvider, keys: string[]) => {
+    const persistence = persistProviderKeys(provider, keys);
+    const status = persistence.persistent
+      ? 'persistent'
+      : persistence.session
+        ? 'session'
+        : 'memory';
+    setKeyPersistenceByProvider((previous) => ({
+      ...previous,
+      [provider]: status,
+    }));
   }, []);
 
   const setGeminiKeys = useCallback((keys: string[]) => {
     const cleaned = keys
       .map((k) => cleanHeaderValue(k))
       .filter((k) => k.length >= 8);
+    geminiApiKeysRef.current = cleaned;
     setGeminiApiKeysState(cleaned);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visionos_gemini_api_keys', JSON.stringify(cleaned));
-      localStorage.setItem('visionos_gemini_api_key', cleaned[0] || '');
-      localStorage.setItem('canvasos_gemini_api_keys', JSON.stringify(cleaned));
-      localStorage.setItem('canvasos_gemini_api_key', cleaned[0] || '');
-    }
-  }, []);
+    persistKeysAndSetStatus('gemini', cleaned);
+  }, [persistKeysAndSetStatus]);
 
   const addGeminiKey = useCallback((rawKey: string) => {
     const newKeys = parseKeysList(rawKey);
     if (newKeys.length === 0) return;
-    setGeminiApiKeysState((prev) => {
-      const merged = Array.from(new Set([...prev, ...newKeys]));
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(
-          'visionos_gemini_api_keys',
-          JSON.stringify(merged)
-        );
-        localStorage.setItem('visionos_gemini_api_key', merged[0] || '');
-        localStorage.setItem(
-          'canvasos_gemini_api_keys',
-          JSON.stringify(merged)
-        );
-        localStorage.setItem('canvasos_gemini_api_key', merged[0] || '');
-        sessionStorage.setItem(
-          'visionos_gemini_api_keys',
-          JSON.stringify(merged)
-        );
-        sessionStorage.setItem('visionos_gemini_api_key', merged[0] || '');
-      }
-      return merged;
-    });
+    const merged = Array.from(new Set([...geminiApiKeysRef.current, ...newKeys]));
+    geminiApiKeysRef.current = merged;
+    setGeminiApiKeysState(merged);
+    persistKeysAndSetStatus('gemini', merged);
     setProviderState('gemini');
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visionos_ai_provider', 'gemini');
-      localStorage.setItem('canvasos_ai_provider', 'gemini');
-    }
-  }, []);
+    persistPreferenceAliases(
+      ['visionos_ai_provider', 'canvasos_ai_provider'],
+      'gemini'
+    );
+  }, [persistKeysAndSetStatus]);
 
   const removeGeminiKey = useCallback((keyToRemove: string) => {
-    setGeminiApiKeysState((prev) => {
-      const filtered = prev.filter((k) => k !== keyToRemove);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(
-          'visionos_gemini_api_keys',
-          JSON.stringify(filtered)
-        );
-        localStorage.setItem('visionos_gemini_api_key', filtered[0] || '');
-        localStorage.setItem(
-          'canvasos_gemini_api_keys',
-          JSON.stringify(filtered)
-        );
-        localStorage.setItem('canvasos_gemini_api_key', filtered[0] || '');
-      }
-      return filtered;
-    });
-  }, []);
+    const filtered = geminiApiKeysRef.current.filter((key) => key !== keyToRemove);
+    geminiApiKeysRef.current = filtered;
+    setGeminiApiKeysState(filtered);
+    persistKeysAndSetStatus('gemini', filtered);
+  }, [persistKeysAndSetStatus]);
 
   const saveGeminiKey = useCallback(
     (key: string) => {
@@ -393,60 +430,26 @@ export function useSpatialAI(
     const cleaned = keys
       .map((k) => cleanHeaderValue(k))
       .filter((k) => k.length >= 8);
+    openRouterApiKeysRef.current = cleaned;
     setOpenRouterApiKeysState(cleaned);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(
-        'visionos_openrouter_api_keys',
-        JSON.stringify(cleaned)
-      );
-      localStorage.setItem('visionos_openrouter_api_key', cleaned[0] || '');
-      localStorage.setItem(
-        'canvasos_openrouter_api_keys',
-        JSON.stringify(cleaned)
-      );
-      localStorage.setItem('canvasos_openrouter_api_key', cleaned[0] || '');
-    }
-  }, []);
+    persistKeysAndSetStatus('openrouter', cleaned);
+  }, [persistKeysAndSetStatus]);
 
   const addOpenRouterKey = useCallback((rawKey: string) => {
     const newKeys = parseKeysList(rawKey);
     if (newKeys.length === 0) return;
-    setOpenRouterApiKeysState((prev) => {
-      const merged = Array.from(new Set([...prev, ...newKeys]));
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(
-          'visionos_openrouter_api_keys',
-          JSON.stringify(merged)
-        );
-        localStorage.setItem('visionos_openrouter_api_key', merged[0] || '');
-        localStorage.setItem(
-          'canvasos_openrouter_api_keys',
-          JSON.stringify(merged)
-        );
-        localStorage.setItem('canvasos_openrouter_api_key', merged[0] || '');
-      }
-      return merged;
-    });
-  }, []);
+    const merged = Array.from(new Set([...openRouterApiKeysRef.current, ...newKeys]));
+    openRouterApiKeysRef.current = merged;
+    setOpenRouterApiKeysState(merged);
+    persistKeysAndSetStatus('openrouter', merged);
+  }, [persistKeysAndSetStatus]);
 
   const removeOpenRouterKey = useCallback((keyToRemove: string) => {
-    setOpenRouterApiKeysState((prev) => {
-      const filtered = prev.filter((k) => k !== keyToRemove);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(
-          'visionos_openrouter_api_keys',
-          JSON.stringify(filtered)
-        );
-        localStorage.setItem('visionos_openrouter_api_key', filtered[0] || '');
-        localStorage.setItem(
-          'canvasos_openrouter_api_keys',
-          JSON.stringify(filtered)
-        );
-        localStorage.setItem('canvasos_openrouter_api_key', filtered[0] || '');
-      }
-      return filtered;
-    });
-  }, []);
+    const filtered = openRouterApiKeysRef.current.filter((key) => key !== keyToRemove);
+    openRouterApiKeysRef.current = filtered;
+    setOpenRouterApiKeysState(filtered);
+    persistKeysAndSetStatus('openrouter', filtered);
+  }, [persistKeysAndSetStatus]);
 
   const saveOpenRouterKey = useCallback(
     (key: string) => {
@@ -462,30 +465,79 @@ export function useSpatialAI(
         ? 'gemini-3.8-flash'
         : cleaned;
     setGeminiModelState(target);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visionos_gemini_model', target);
-      localStorage.setItem('canvasos_gemini_model', target);
-    }
+    persistPreferenceAliases(['visionos_gemini_model', 'canvasos_gemini_model'], target);
   }, []);
 
   const setOpenRouterModel = useCallback((model: string) => {
     const cleaned = cleanHeaderValue(model);
     setOpenRouterModelState(cleaned);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('visionos_openrouter_model', cleaned);
-      localStorage.setItem('canvasos_openrouter_model', cleaned);
-    }
+    persistPreferenceAliases(
+      ['visionos_openrouter_model', 'canvasos_openrouter_model'],
+      cleaned
+    );
   }, []);
 
-  const activeModel = provider === 'openrouter' ? openRouterModel : geminiModel;
+  const setOpenAiKeys = useCallback((keys: string[]) => {
+    const cleaned = filterProviderKeys('openai', keys.map(cleanHeaderValue));
+    openAiApiKeysRef.current = cleaned;
+    setOpenAiApiKeysState(cleaned);
+    persistKeysAndSetStatus('openai', cleaned);
+  }, [persistKeysAndSetStatus]);
+
+  const addOpenAiKey = useCallback((rawKey: string) => {
+    const newKeys = parseKeysList(rawKey);
+    if (newKeys.length === 0) return;
+    const merged = filterProviderKeys('openai', Array.from(new Set([...openAiApiKeysRef.current, ...newKeys])));
+    openAiApiKeysRef.current = merged;
+    setOpenAiApiKeysState(merged);
+    persistKeysAndSetStatus('openai', merged);
+  }, [persistKeysAndSetStatus]);
+
+  const removeOpenAiKey = useCallback((keyToRemove: string) => {
+    const filtered = openAiApiKeysRef.current.filter((key) => key !== keyToRemove);
+    openAiApiKeysRef.current = filtered;
+    setOpenAiApiKeysState(filtered);
+    persistKeysAndSetStatus('openai', filtered);
+  }, [persistKeysAndSetStatus]);
+
+  const saveOpenAiKey = useCallback(
+    (key: string) => {
+      addOpenAiKey(key);
+    },
+    [addOpenAiKey]
+  );
+
+  const setOpenAiModel = useCallback((model: string) => {
+    const cleaned = cleanHeaderValue(model);
+    const target = !cleaned ? 'gpt-4o' : cleaned;
+    setOpenAiModelState(target);
+    persistPreferenceAliases(['visionos_openai_model', 'canvasos_openai_model'], target);
+  }, []);
+
+  const activeModel =
+    provider === 'openrouter'
+      ? openRouterModel
+      : provider === 'openai'
+        ? openAiModel
+        : geminiModel;
+  const keyPersistenceStatus = keyPersistenceByProvider[provider];
+  const keyPersistenceAvailable = keyPersistenceStatus === 'persistent';
+  const geminiKeyPersistenceStatus = keyPersistenceByProvider.gemini;
   const geminiApiKey = geminiApiKeys[0] || '';
   const openRouterApiKey = openRouterApiKeys[0] || '';
+  const openAiApiKey = openAiApiKeys[0] || '';
   const activeApiKey =
-    provider === 'openrouter' ? openRouterApiKey : geminiApiKey;
+    provider === 'openrouter'
+      ? openRouterApiKey
+      : provider === 'openai'
+        ? openAiApiKey
+        : geminiApiKey;
   const hasActiveKey =
     provider === 'openrouter'
       ? openRouterApiKeys.length > 0
-      : geminiApiKeys.length > 0;
+      : provider === 'openai'
+        ? openAiApiKeys.length > 0
+        : geminiApiKeys.length > 0;
 
   const busyRef = useRef(false);
   const contextHistoryRef = useRef(new Map<string, string>());
@@ -493,11 +545,13 @@ export function useSpatialAI(
   const [historyLoaded, setHistoryLoaded] = useState(false);
   useEffect(() => {
     try {
-      const saved = JSON.parse(
-        localStorage.getItem('visionos_chat_v2') ||
-        localStorage.getItem('canvasos_chat_v2') ||
-        'null'
-      );
+      const current = readLocalStorage('visionos_chat_v2');
+      const legacy = current.value === null || current.value === ''
+        ? readLocalStorage('canvasos_chat_v2')
+        : { available: true, value: null };
+      if (!current.available || !legacy.available)
+        setStorageWarning('Chat could not be restored because browser storage is unavailable.');
+      const saved = JSON.parse(current.value ?? legacy.value ?? 'null');
       if (Array.isArray(saved) && saved.length)
         setMessages(
           saved
@@ -543,8 +597,10 @@ export function useSpatialAI(
           executedActions: m.executedActions?.slice(0, 100),
         }))
       );
-      localStorage.setItem('visionos_chat_v2', serialized);
-      localStorage.setItem('canvasos_chat_v2', serialized);
+      const currentSaved = writeLocalStorage('visionos_chat_v2', serialized);
+      const legacySaved = writeLocalStorage('canvasos_chat_v2', serialized);
+      if (!currentSaved || !legacySaved)
+        throw new Error('Chat storage unavailable.');
     } catch {
       try {
         const compact = JSON.stringify(
@@ -562,8 +618,10 @@ export function useSpatialAI(
             })),
           }))
         );
-        localStorage.setItem('visionos_chat_v2', compact);
-        localStorage.setItem('canvasos_chat_v2', compact);
+        const currentSaved = writeLocalStorage('visionos_chat_v2', compact);
+        const legacySaved = writeLocalStorage('canvasos_chat_v2', compact);
+        if (!currentSaved || !legacySaved)
+          throw new Error('Chat storage unavailable.');
       } catch {
         setStorageWarning(
           'Chat could not be saved. Export this conversation before closing.'
@@ -613,7 +671,10 @@ export function useSpatialAI(
     model: activeModel,
     apiKeys: geminiApiKeys,
     openRouterApiKeys,
+    openaiApiKeys: openAiApiKeys,
     apiKey: activeApiKey,
+    openaiApiKey: openAiApiKey,
+    openRouterApiKey,
   });
   const baseline = () =>
     new Map(
@@ -702,17 +763,25 @@ export function useSpatialAI(
       : `⚠️ ${error instanceof Error ? error.message : String(error)}`;
   const commit = async (
     turn: NonNullable<ReturnType<typeof begin>>,
-    frames: SpatialActionFrame[]
+    frames: SpatialActionFrame[],
+    transmittedSources: SpatialNodeItem[] = []
   ) => {
+    if (!editor) throw new Error('Canvas engine is not ready.');
+    assertSpatialActionsWritable(editor, frames);
     turn.controller.signal.throwIfAborted();
-    if (editor!.getCurrentPageId() !== turn.pageId)
+    if (editor.getCurrentPageId() !== turn.pageId)
       throw new Error(
         'You switched pages while I was working. Return to the original page and retry.'
       );
     frames.forEach(validateAction);
     checkStale(turn.before, frames);
     if (frames.length)
-      await spatial.runSpatialActions(frames, turn.id, turn.controller.signal);
+      await spatial.runSpatialActions(
+        frames,
+        turn.id,
+        turn.controller.signal,
+        transmittedSources
+      );
     return frames.map(
       (f) =>
         ({
@@ -738,6 +807,10 @@ export function useSpatialAI(
         (editor.getSelectedShapes().some((s) => s.type === 'artifact')
           ? 'Regenerate this app, preserving its functionality and saved data.'
           : 'Turn this sketch into a responsive, working app.');
+      if (editor.getIsReadonly()) {
+        reportReadonlyAction(prompt);
+        return;
+      }
       const selected = editor.getSelectedShapes();
       const targets = (
         /\b(all|everything)\b/i.test(prompt)
@@ -746,6 +819,11 @@ export function useSpatialAI(
       ).filter((s) => s.type === 'artifact');
       const turn = begin(prompt, true);
       if (!turn) return;
+      const transmittedSources = targets.length
+        ? serializeCanvas(editor).filter((node) =>
+            targets.some((target) => target.id === node.id)
+          )
+        : [];
 
       // Speculative Skeleton Streaming: calculate non-overlapping placement coordinates
       // immediately upon summoning using calculateMakeRealPlacement and invoke spatial.addSkeleton
@@ -753,6 +831,7 @@ export function useSpatialAI(
       try {
         const selectionBounds =
           editor.getSelectionPageBounds() || editor.getViewportPageBounds();
+        assertCanvasWritable(editor);
         if (selectionBounds && !targets.length) {
           const existing = editor.getCurrentPageShapes().flatMap((s) => {
             const b = editor.getShapePageBounds(s.id);
@@ -788,13 +867,14 @@ export function useSpatialAI(
             }
           }
         }
-      } catch (e) {
-        console.warn('[VisionOS] Could not pre-calculate skeleton placement:', e);
+      } catch {
+        console.warn('[VisionOS] Could not pre-calculate skeleton placement.');
       }
 
       const timeout = setTimeout(() => turn.controller.abort(), 180000);
       try {
         const frames: SpatialActionFrame[] = [];
+        const modelFallbacks = new Set<string>();
         // Existing apps are grounded by source, since iframe pixels cannot be exported by SVG.
         const capture = targets.length
           ? null
@@ -802,6 +882,7 @@ export function useSpatialAI(
         const inputs = targets.length ? targets : [null];
         for (let i = 0; i < inputs.length; i++) {
           turn.controller.signal.throwIfAborted();
+          assertCanvasWritable(editor);
           const target = inputs[i];
           if (
             target &&
@@ -830,6 +911,14 @@ export function useSpatialAI(
           if (!response.ok)
             throw new Error(
               data.error || `Generation failed (${response.status}).`
+            );
+          if (
+            typeof data.requestedModel === 'string' &&
+            typeof data.selectedModel === 'string' &&
+            data.requestedModel !== data.selectedModel
+          )
+            modelFallbacks.add(
+              `${data.selectedModel} (requested ${data.requestedModel} was unavailable)`
             );
           assertCompleteHtml(data.code);
           if (target)
@@ -869,10 +958,13 @@ export function useSpatialAI(
             });
           }
         }
-        const executedActions = await commit(turn, frames);
+        const executedActions = await commit(turn, frames, transmittedSources);
         spatial.clearSkeletons();
+        const fallbackNotice = modelFallbacks.size
+          ? `\n\nFallback model used: ${[...modelFallbacks].join('; ')}.`
+          : '';
         patchMessage(turn.id, {
-          content: `${targets.length ? 'Regenerated' : 'Created'} ${frames.length} app${frames.length === 1 ? '' : 's'}.`,
+          content: `${targets.length ? 'Regenerated' : 'Created'} ${frames.length} app${frames.length === 1 ? '' : 's'}.${fallbackNotice}`,
           executedActions,
           isStreaming: false,
         });
@@ -887,7 +979,7 @@ export function useSpatialAI(
         finish();
       }
     },
-    [editor, spatial, provider, activeModel, geminiApiKeys, openRouterApiKeys]
+    [editor, spatial, provider, activeModel, geminiApiKeys, openRouterApiKeys, reportReadonlyAction]
   );
 
   const sendMessage = useCallback(
@@ -904,6 +996,14 @@ export function useSpatialAI(
             timestamp: Date.now(),
           },
         ]);
+        return;
+      }
+      if (
+        editor.getIsReadonly() &&
+        isExplicitCanvasMutationCommand(prompt) &&
+        isCanvasActionIntent(prompt, editor.getSelectedShapeIds().length > 0)
+      ) {
+        reportReadonlyAction(prompt);
         return;
       }
       // Only explicit "make real" sketch conversions route to the vision endpoint;
@@ -939,13 +1039,7 @@ export function useSpatialAI(
             'The selection is too large for a safe full-content edit. Select fewer elements.'
           );
         // Nearby objects only need previews; board index retains geometry for offscreen references.
-        context.viewportNeighbors = context.viewportNeighbors.map((n) => ({
-          ...n,
-          code: n.code?.slice(0, 180),
-          content: n.content?.slice(0, 180),
-          text: n.text?.slice(0, 180),
-          storage: undefined,
-        }));
+        context.viewportNeighbors = context.viewportNeighbors.map(compactViewportNeighbor);
         const recentEntities = messages
           .flatMap((m) => m.executedActions || [])
           .slice(-20)
@@ -1024,6 +1118,15 @@ export function useSpatialAI(
             data?.error || `Request failed (${response.status}).`
           );
         }
+        const requestedModel = response.headers.get('X-Requested-Model') || activeModel;
+        const selectedModel = response.headers.get('X-Selected-Model');
+        const modelFallbackNotice =
+          !useSwarm &&
+          selectedModel &&
+          requestedModel &&
+          selectedModel !== requestedModel
+            ? `\n\nFallback model used: ${selectedModel} (requested ${requestedModel} was unavailable).`
+            : '';
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -1084,7 +1187,7 @@ export function useSpatialAI(
           throw new Error(
             'The connection ended before generation completed. No pending changes were applied. Retry.'
           );
-        const executedActions = await commit(turn, frames);
+        const executedActions = await commit(turn, frames, context.selectedNodes);
         const requestedAction = isCanvasActionIntent(
           prompt,
           context.selectedNodes.length > 0
@@ -1101,7 +1204,7 @@ export function useSpatialAI(
             : cleanText ||
               'The model returned an empty response. Please retry.';
         patchMessage(turn.id, {
-          content: result,
+          content: `${result}${modelFallbackNotice}`,
           isStreaming: false,
           executedActions,
         });
@@ -1127,6 +1230,7 @@ export function useSpatialAI(
       temperature,
       swarmMode,
       makeReal,
+      reportReadonlyAction,
     ]
   );
   const stopGeneration = useCallback(() => {
@@ -1153,6 +1257,9 @@ export function useSpatialAI(
   );
   return {
     storageWarning,
+    keyPersistenceAvailable,
+    keyPersistenceStatus,
+    geminiKeyPersistenceStatus,
     messages,
     isGenerating,
     isMakingReal,
@@ -1164,10 +1271,14 @@ export function useSpatialAI(
     geminiApiKeys,
     openRouterApiKey,
     openRouterApiKeys,
+    openAiApiKey,
+    openAiApiKeys,
     geminiModel,
     openRouterModel,
+    openAiModel,
     setGeminiModel,
     setOpenRouterModel,
+    setOpenAiModel,
     setGeminiKeys,
     addGeminiKey,
     removeGeminiKey,
@@ -1176,6 +1287,10 @@ export function useSpatialAI(
     addOpenRouterKey,
     removeOpenRouterKey,
     saveOpenRouterKey,
+    setOpenAiKeys,
+    addOpenAiKey,
+    removeOpenAiKey,
+    saveOpenAiKey,
     thinkingMode,
     setThinkingMode,
     swarmMode,
@@ -1186,7 +1301,11 @@ export function useSpatialAI(
     hasActiveKey,
     apiKey: activeApiKey,
     saveApiKey: (key: string) =>
-      provider === 'openrouter' ? saveOpenRouterKey(key) : saveGeminiKey(key),
+      provider === 'openrouter'
+        ? saveOpenRouterKey(key)
+        : provider === 'openai'
+          ? saveOpenAiKey(key)
+          : saveGeminiKey(key),
     sendMessage,
     stopGeneration,
     clearChat,

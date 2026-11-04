@@ -1,0 +1,35 @@
+$ next build
+   ▲ Next.js 15.5.28
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 1808ms
+   Linting and checking validity of types ...
+   Collecting page data ...
+ ⚠ Using edge runtime on a page currently disables static generation for that page
+   Generating static pages (0/10) ...
+   Generating static pages (2/10) 
+   Generating static pages (4/10) 
+   Generating static pages (7/10) 
+ ✓ Generating static pages (10/10)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    22.7 kB         126 kB
+├ ○ /_not-found                            996 B         104 kB
+├ ƒ /api/ai/chat                           139 B         103 kB
+├ ƒ /api/ai/make-real                      139 B         103 kB
+├ ƒ /api/ai/openai-check                   139 B         103 kB
+├ ƒ /api/ai/spatial-stream                 139 B         103 kB
+├ ƒ /api/ai/swarm                          139 B         103 kB
+├ ƒ /api/auth/openai/token                 139 B         103 kB
+└ ○ /auth/openai/callback                6.21 kB         110 kB
++ First Load JS shared by all             103 kB
+  ├ chunks/255-69b43252deae6b47.js       46.3 kB
+  ├ chunks/4bd1b696-409494caf8c83275.js  54.2 kB
+  └ other shared chunks (total)          2.79 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

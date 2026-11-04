@@ -1,0 +1,14 @@
+$ tsc --noEmit
+.next-review/types/app/api/ai/openai-check/route.ts(2,24): error TS2307: Cannot find module '../../../../../../src/app/api/ai/openai-check/route.js' or its corresponding type declarations.
+.next-review/types/app/api/ai/openai-check/route.ts(5,29): error TS2307: Cannot find module '../../../../../../src/app/api/ai/openai-check/route.js' or its corresponding type declarations.
+.next-review/types/app/api/auth/openai/token/route.ts(2,24): error TS2307: Cannot find module '../../../../../../../src/app/api/auth/openai/token/route.js' or its corresponding type declarations.
+.next-review/types/app/api/auth/openai/token/route.ts(5,29): error TS2307: Cannot find module '../../../../../../../src/app/api/auth/openai/token/route.js' or its corresponding type declarations.
+.next-review/types/app/auth/openai/callback/page.ts(2,24): error TS2307: Cannot find module '../../../../../../src/app/auth/openai/callback/page.js' or its corresponding type declarations.
+.next-review/types/app/auth/openai/callback/page.ts(5,29): error TS2307: Cannot find module '../../../../../../src/app/auth/openai/callback/page.js' or its corresponding type declarations.
+.next-review/types/validator.ts(53,39): error TS2307: Cannot find module '../../src/app/auth/openai/callback/page.js' or its corresponding type declarations.
+.next-review/types/validator.ts(89,39): error TS2307: Cannot find module '../../src/app/api/ai/openai-check/route.js' or its corresponding type declarations.
+.next-review/types/validator.ts(116,39): error TS2307: Cannot find module '../../src/app/api/auth/openai/token/route.js' or its corresponding type declarations.
+.next/types/validator.ts(53,39): error TS2307: Cannot find module '../../src/app/auth/openai/callback/page.js' or its corresponding type declarations.
+.next/types/validator.ts(89,39): error TS2307: Cannot find module '../../src/app/api/ai/openai-check/route.js' or its corresponding type declarations.
+.next/types/validator.ts(116,39): error TS2307: Cannot find module '../../src/app/api/auth/openai/token/route.js' or its corresponding type declarations.
+src/test/dashboardAndChatGPT.test.ts(39,66): error TS2554: Expected 1 arguments, but got 2.

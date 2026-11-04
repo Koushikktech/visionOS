@@ -1,0 +1,41 @@
+PAGE2 visionOS
+SPATIAL
+Page 1
+1
+EXPORT CANVAS
+Export as PNG (2x)
+Export as Vector SVG
+Download editable backupRestore workspace backup…
+On-device recovery
+
+Recovery copy saved on this device · Oct 26, 2026, 10:13 PM
+
+Recovery copy saved on this device
+Recovery copy saved on this device
+100%
+Ask visionOS Spatial AI...
+K
+New Technical Document
+2 sections
+OUTLINE
+1. Executive Summary
+2. Architecture Specification
+New Technical Document
+
+Structured Notion-grade documentation card
+
+User
+2026
+1
+min read
+1
+1. Executive Summary
+Introduction
+
+Write your documentation here with markdown, math, and tables.
+
+2
+2. Architecture Specification
+System Design
+
+Detailed system architecture, components, and implementation specifications.

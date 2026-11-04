@@ -1,5 +1,8 @@
 'use client';
 
+import { AIOrb } from '../components/AIOrb';
+
+
 import {
   BaseBoxShapeUtil,
   HTMLContainer,
@@ -11,7 +14,6 @@ import {
 } from '@tldraw/tldraw';
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
-  Sparkles,
   Copy,
   Check,
   Maximize2,
@@ -22,14 +24,16 @@ import {
   Columns,
   Terminal,
   Pencil,
-  Eye,
-  GripHorizontal,
 } from 'lucide-react';
 import { marked } from 'marked';
 import katex from 'katex';
 import DOMPurify from 'dompurify';
 import type { CardArchetype } from '../types/spatial';
 import { smartStopPropagation } from '../lib/panModifier';
+import { useShapeDraft } from '../hooks/useShapeDraft';
+import { ShapeFocusLayer } from '../components/ShapeFocusLayer';
+import { ArtifactHeaderActions } from '../components/ArtifactHeaderActions';
+import { subscribeToShapeEditing } from '../lib/shapeEditing';
 
 export type TLRichCardShape = TLBaseShape<
   'rich_card',
@@ -216,18 +220,35 @@ function RichCardComponent({
   const isSelected = Boolean(editor?.getSelectedShapeIds?.()?.includes(shape.id));
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(shape.props.title);
-  const [editContent, setEditContent] = useState(shape.props.content);
+  const [saveError, setSaveError] = useState('');
+  const draft = useShapeDraft(
+    `rich_card:${shape.id}`,
+    { title: shape.props.title, content: shape.props.content },
+    { editor, shapeId: shape.id }
+  );
+  const editTitle = draft.value.title;
+  const editContent = draft.value.content;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const frame = requestAnimationFrame(() => textareaRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (draft.recovered) setIsEditing(true);
+  }, [draft.recovered]);
+
+  useEffect(() => subscribeToShapeEditing(shape.id, () => {
+    const current = editor?.getShape?.(shape.id);
+    if (!current || editor?.getIsReadonly?.() || editor?.isShapeOrAncestorLocked?.(current)) return;
+    setIsEditing(true);
+  }), [editor, shape.id]);
 
   const { w, h, title, content, archetype = 'note', isStreaming } = shape.props;
   const config = ARCHETYPE_CONFIG[archetype] || ARCHETYPE_CONFIG.note;
   const IconComponent = config.icon;
-
-  useEffect(() => {
-    setEditTitle(shape.props.title);
-    setEditContent(shape.props.content);
-  }, [shape.props.title, shape.props.content]);
 
   const htmlContent = useMemo(() => {
     return renderMarkdownWithKaTeX(content);
@@ -245,17 +266,38 @@ function RichCardComponent({
   );
 
   const handleSaveEdit = useCallback(() => {
-    setIsEditing(false);
-    onUpdate({
+    const next = {
       title: editTitle.trim() || 'Untitled Note',
       content: editContent,
-    });
-  }, [editTitle, editContent, onUpdate]);
+    };
+    setSaveError('');
+    try {
+      onUpdate(next);
+      const savedShape = editor?.getShape?.(shape.id);
+      if (
+        savedShape?.type !== 'rich_card' ||
+        savedShape.props.title !== next.title ||
+        savedShape.props.content !== next.content
+      )
+        throw new Error('The note could not be saved to the canvas. Your draft is still here.');
+      draft.save(next);
+      setIsEditing(false);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'The note could not be saved. Your draft is still here.');
+    }
+  }, [editTitle, editContent, onUpdate, editor, shape.id, draft.save]);
+
+  const handleDiscardEdit = useCallback(() => {
+    draft.discard();
+    setSaveError('');
+    setIsEditing(false);
+  }, [draft.discard]);
 
   return (
+    <>
     <HTMLContainer
       id={shape.id}
-      className="pointer-events-auto overflow-hidden rounded-2xl liquid-glass-card transition-all flex flex-col antialiased"
+      className="studio-native-window studio-native-note pointer-events-auto overflow-hidden rounded-2xl transition-colors flex flex-col antialiased"
       style={{
         width: w,
         height: h,
@@ -263,32 +305,20 @@ function RichCardComponent({
     >
       {/* Top Window Bar */}
       <div
+        data-window-header="note"
         className="flex h-11 w-full shrink-0 items-center justify-between liquid-glass-header px-3.5 select-none cursor-grab active:cursor-grabbing"
       >
         <div className="flex items-center gap-2 overflow-hidden flex-1 mr-2">
           <IconComponent className="h-4 w-4 text-slate-400 shrink-0" strokeWidth={1.5} />
 
-          {isEditing ? (
-            <input
-              type="text"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              onPointerDown={stopEventPropagation}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveEdit();
-              }}
-              className="bg-black/50 border border-white/20 rounded px-2 py-0.5 text-xs text-white outline-none focus:border-white/40 font-semibold flex-1"
-              placeholder="Note Title..."
-            />
-          ) : (
-            <span
-              className="truncate text-xs font-semibold tracking-wide text-slate-200"
-              title={title}
-              onDoubleClick={() => setIsEditing(true)}
-            >
-              {title || 'Canvas Note'}
-            </span>
-          )}
+          <span
+            data-window-title
+            className="truncate text-xs font-semibold tracking-wide text-slate-200"
+            title={title}
+            onDoubleClick={() => setIsEditing(true)}
+          >
+            {title || 'Canvas Note'}
+          </span>
 
           <span
             className="shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-mono tabular-nums text-slate-400 bg-white/5 border border-white/10 uppercase tracking-wider"
@@ -298,69 +328,84 @@ function RichCardComponent({
 
           {isStreaming && (
             <span className="flex items-center gap-1 text-[9px] font-mono tabular-nums text-indigo-300 animate-pulse bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-400/20">
-              <Sparkles className="h-2.5 w-2.5" />
+              <AIOrb className="h-2.5 w-2.5" />
               Streaming...
             </span>
           )}
         </div>
 
         {/* Card Controls */}
-        <div
-          className="flex items-center gap-1 shrink-0"
-          onPointerDown={stopEventPropagation}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              if (isEditing) handleSaveEdit();
-              else setIsEditing(true);
-            }}
-            title={isEditing ? 'Preview Markdown' : 'Edit Note Content'}
-            className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-slate-100 active:scale-[0.96] transition-all"
-          >
-            {isEditing ? <Eye className="h-4 w-4 text-indigo-400" strokeWidth={1.5} /> : <Pencil className="h-4 w-4" strokeWidth={1.5} />}
-          </button>
-          <button
-            type="button"
-            onClick={handleCopy}
-            title={copied ? 'Copied!' : 'Copy Markdown'}
-            className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-slate-100 active:scale-[0.96] transition-all"
-          >
-            {copied ? <Check className="h-4 w-4 text-emerald-400" strokeWidth={1.5} /> : <Copy className="h-4 w-4" strokeWidth={1.5} />}
-          </button>
-        </div>
+        <ArtifactHeaderActions
+          menuLabel="Note actions"
+          primaryAction={{ label: 'Edit note content', icon: <Pencil />, onSelect: () => setIsEditing(true) }}
+          actions={[{ id: 'copy', label: copied ? 'Markdown copied' : 'Copy Markdown', icon: copied ? <Check /> : <Copy />, onSelect: handleCopy }]}
+        />
       </div>
 
-      {/* Body Area: Live Markdown + KaTeX OR Interactive Editor */}
+      {/* Body Area: Live Markdown + KaTeX */}
       <div
         data-scrollable="true"
-        className="relative flex-1 min-h-0 w-full overflow-y-auto p-4 text-xs leading-relaxed text-slate-200 select-text overscroll-contain custom-card-scrollbar"
+        className="relative flex-1 min-h-0 w-full overflow-y-auto p-4 text-sm leading-relaxed text-slate-200 select-text overscroll-contain custom-card-scrollbar"
         onPointerDown={isSelected ? smartStopPropagation : undefined}
         onDoubleClick={() => !isEditing && setIsEditing(true)}
       >
-        {isEditing ? (
-          <textarea
-            ref={textareaRef}
-            value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            onPointerDown={smartStopPropagation}
-            data-scrollable="true"
-            placeholder="Write your markdown and LaTeX math formulas ($E=mc^2$ or $$\int...$$)..."
-            className="w-full h-full resize-none bg-black/40 border border-white/10 rounded-xl p-3 font-mono text-xs text-indigo-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-          />
-        ) : (
-          <>
-            <div
-              className="rich-card-prose prose prose-invert max-w-none prose-p:my-1.5 prose-headings:my-2 prose-headings:text-white prose-pre:my-2 prose-pre:bg-black/60 prose-pre:border prose-pre:border-white/10 prose-code:text-indigo-300 prose-code:bg-white/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-ul:my-1 prose-li:my-0.5"
-              dangerouslySetInnerHTML={{ __html: htmlContent }}
-            />
-            {isStreaming && (
-              <span className="inline-block w-1.5 h-3.5 ml-1 bg-indigo-400 animate-pulse align-middle" />
-            )}
-          </>
+        <div
+          className="rich-card-prose prose prose-sm prose-invert max-w-none prose-p:my-1.5 prose-headings:my-2 prose-headings:text-white prose-pre:my-2 prose-pre:bg-black/60 prose-pre:border prose-pre:border-white/10 prose-code:text-indigo-300 prose-code:bg-white/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-ul:my-1 prose-li:my-0.5"
+          dangerouslySetInnerHTML={{ __html: htmlContent }}
+        />
+        {isStreaming && (
+          <span className="inline-block w-1.5 h-3.5 ml-1 bg-indigo-400 animate-pulse align-middle" />
         )}
       </div>
     </HTMLContainer>
+    {isEditing && (
+      <ShapeFocusLayer title={`Edit ${editTitle || title || 'note'}`} onClose={() => setIsEditing(false)}>
+        <div className="flex h-full min-h-0 flex-col gap-3 bg-slate-950 p-3 sm:p-5">
+          {(draft.hasConflict || draft.recovered || saveError || (draft.isDirty && !draft.recoveryAvailable)) && (
+            <div
+              role={saveError ? 'alert' : 'status'}
+              className="shrink-0 rounded-xl border border-amber-300/25 bg-amber-400/10 px-3 py-2.5 text-sm leading-relaxed text-amber-100"
+            >
+              {saveError ||
+                (draft.hasConflict
+                  ? 'Canvas content changed while this draft was open. Save to replace the latest content, or discard to load it.'
+                  : !draft.recoveryAvailable
+                    ? 'This draft is too large for recovery after a reload. Save it to the canvas now.'
+                    : 'Recovered an unsaved note draft. Save or discard it when ready.')}
+            </div>
+          )}
+          <label className="flex shrink-0 flex-col gap-1.5 text-sm font-medium text-slate-200">
+            Note title
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => draft.setValue((current) => ({ ...current, title: e.target.value }))}
+              onPointerDown={stopEventPropagation}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(); }}
+              className="min-h-11 rounded-xl border border-white/15 bg-black/45 px-3 text-base text-white outline-none focus:border-sky-300 focus-visible:ring-2 focus-visible:ring-sky-300/70"
+              placeholder="Note title"
+            />
+          </label>
+          <label className="flex min-h-0 flex-1 flex-col gap-1.5 text-sm font-medium text-slate-200">
+            Markdown and LaTeX content
+            <textarea
+              ref={textareaRef}
+              value={editContent}
+              onChange={(e) => draft.setValue((current) => ({ ...current, content: e.target.value }))}
+              data-scrollable="true"
+              placeholder="Write your markdown and LaTeX math formulas ($E=mc^2$ or $$\int...$$)..."
+              className="min-h-0 w-full flex-1 resize-none rounded-xl border border-white/15 bg-black/45 p-3 font-mono text-base leading-relaxed text-indigo-100 outline-none focus:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-300/70"
+            />
+          </label>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-white/10 pt-3">
+            <button type="button" onClick={() => setIsEditing(false)} className="min-h-11 rounded-xl px-4 text-sm font-medium text-slate-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70">Return to canvas</button>
+            <button type="button" onClick={handleDiscardEdit} className="min-h-11 rounded-xl border border-white/15 px-4 text-sm font-medium text-slate-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70">Discard draft</button>
+            <button type="button" onClick={handleSaveEdit} className="min-h-11 rounded-xl bg-sky-500 px-4 text-sm font-semibold text-white hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200">Save note</button>
+          </div>
+        </div>
+      </ShapeFocusLayer>
+    )}
+    </>
   );
 }
 

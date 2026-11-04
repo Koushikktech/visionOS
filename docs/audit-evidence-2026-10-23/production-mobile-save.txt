@@ -1,0 +1,2 @@
+mobile focus { x: 0, y: 0, width: 320, height: 568 }
+320px touch edit/add/save/reopen passed

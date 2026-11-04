@@ -1,4 +1,4 @@
-import type { AISpatialChatRequest, SpatialActionFrame } from '@/types/spatial';
+import type { AISpatialChatRequest, SpatialActionFrame, SpatialDeckSlide } from '@/types/spatial';
 import { stripMarkdownFences } from '@/lib/sanitizeHtml';
 
 /**
@@ -33,6 +33,30 @@ function truncateString(str: string | undefined, maxChars: number): string {
   if (!str) return '';
   if (str.length <= maxChars) return str;
   return `${str.slice(0, maxChars)}... [truncated ${str.length - maxChars} chars]`;
+}
+
+function deckSourceForAI(slides: SpatialDeckSlide[] | undefined) {
+  const fields = ['id', 'title', 'subtitle', 'layout', 'content', 'bullets', 'speakerNotes'] as const;
+  return (slides || []).map((slide) => {
+    const projected: Record<string, unknown> = {};
+    for (const field of fields)
+      if (slide[field] !== undefined) projected[field] = slide[field];
+    for (const [field, allowed] of [
+      ['stats', ['label', 'value', 'change']],
+      ['columns', ['title', 'text', 'icon']],
+      ['timelineSteps', ['step', 'title', 'desc']],
+    ] as const) {
+      const values = slide[field];
+      if (!values) continue;
+      projected[field] = values.map((item) => {
+        const source = item as Record<string, unknown>;
+        return Object.fromEntries(allowed.flatMap((key) =>
+          source[key] === undefined ? [] : [[key, source[key]]]
+        ));
+      });
+    }
+    return projected;
+  });
 }
 
 /**
@@ -101,6 +125,14 @@ export function buildSpatialContextText(body: AISpatialChatRequest): string {
             lines.push(`  Position: (x: ${Math.round(n.minX)}, y: ${Math.round(n.minY)})`);
             lines.push(`  Geometry: ${JSON.stringify({x:n.minX,y:n.minY,w:n.maxX-n.minX,h:n.maxY-n.minY,parentId:n.parentId,z:n.zIndex,rotation:n.rotation,from:n.from,to:n.to})}`);
             if (n.sections) lines.push(`  Sections: ${JSON.stringify(n.sections)}`);
+            if (n.type === 'slide_deck') {
+              lines.push(`  Deck theme: ${n.theme || 'midnight'}`);
+              if (n.currentSlideIndex !== undefined)
+                lines.push(`  Active slide index: ${n.currentSlideIndex}`);
+              // Selected decks carry their complete bounded editable source for
+              // full-replacement mutations. Nearby decks below expose only a preview.
+              lines.push(`  Full editable slide content: ${JSON.stringify(deckSourceForAI(n.slides))}`);
+            }
             return lines.join('\n');
           })
           .join('\n\n')
@@ -136,6 +168,8 @@ export function buildSpatialContextText(body: AISpatialChatRequest): string {
             }
             lines.push(`  Geometry: ${JSON.stringify({x:n.minX,y:n.minY,w:n.maxX-n.minX,h:n.maxY-n.minY,parentId:n.parentId,z:n.zIndex,rotation:n.rotation,from:n.from,to:n.to})}`);
             if (n.sections) lines.push(`  Sections: ${JSON.stringify(n.sections)}`);
+            if (n.type === 'slide_deck')
+              lines.push(`  Deck preview: ${n.slideCount ?? n.slides?.length ?? 0} slides, theme ${n.theme || 'midnight'}`);
             return lines.join('\n');
           })
           .join('\n')
@@ -370,6 +404,30 @@ export function convertToolCallToActionFrame(name: string, args: any): SpatialAc
       date: args?.date,
       sections: args?.sections,
     }) as SpatialActionFrame;
+  } else if (name === 'create_slide_deck') {
+    return cleanPatch({
+      t: 'patch',
+      op: 'create_slide_deck',
+      id: args?.id || `deck_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      title: args?.title || 'Presentation Deck',
+      subtitle: args?.subtitle,
+      theme: args?.theme || 'midnight',
+      currentSlideIndex: args?.currentSlideIndex ?? 0,
+      slides: args?.slides,
+      relative: args?.relative || 'center',
+    }) as SpatialActionFrame;
+  } else if (name === 'mutate_slide_deck' || name === 'update_slide_deck') {
+    return cleanPatch({
+      t: 'patch',
+      op: 'mutate_slide_deck',
+      target: args?.target || args?.id,
+      id: args?.target || args?.id,
+      title: args?.title,
+      subtitle: args?.subtitle,
+      theme: args?.theme,
+      currentSlideIndex: args?.currentSlideIndex,
+      slides: args?.slides,
+    }) as SpatialActionFrame;
   } else if (name === 'connect_shapes') {
     return cleanPatch({
       t: 'patch',
@@ -421,7 +479,7 @@ export function convertToolCallToActionFrame(name: string, args: any): SpatialAc
     }) as SpatialActionFrame;
   }
 
-  console.warn('[VisionOS Tool Parser] Unrecognized tool name received:', name, args);
+  console.warn('[VisionOS Tool Parser] Ignored an unrecognized provider tool call.');
   return null;
 }
 
@@ -519,13 +577,13 @@ export const CANVAS_TOOLS = [
   },
   {
     name: 'spawn_artifact',
-    description: 'Spawns an interactive live sandbox running HTML5, CSS, and JavaScript web applications, widgets, or simulations with built-in persistent virtual storage (localStorage / VisionOS.db).',
+    description: 'Spawns an interactive live sandbox running HTML5, CSS, and JavaScript apps with per-app virtual storage. Apps are local-first by default. Include HTTPS network access only for a site/service the user explicitly requested; the user must separately approve site access in the runtime controls, and this tool call cannot grant it.',
     parameters: {
       type: 'object',
       properties: {
         id: { type: 'string', description: 'Unique semantic ID (e.g. "app_todo_list", "sim_particles")' },
         title: { type: 'string', description: 'Header title of the application or simulation' },
-        code: { type: 'string', description: 'Self-contained HTML5 + CSS + JS code. Can read and write to localStorage or VisionOS.db for persistent state across refreshes.' },
+        code: { type: 'string', description: 'Self-contained HTML5 + CSS + JS. Use localStorage or VisionOS.db for state. Add only HTTPS requests and remote dependencies needed for a site/service the user explicitly requested; do not invent hosts, add convenience CDNs, or include credentials. Runtime site approval is separate and is never granted by this source.' },
         width: { type: 'number', description: 'Optimal responsive viewport width (e.g. 880-1024 for dashboards, 780-840 for standard apps, 460-520 for widgets). Default: 780.' },
         height: { type: 'number', description: 'Optimal responsive viewport height (e.g. 600-720 for dashboards, 540-600 for standard apps, 480-560 for widgets). Default: 540.' },
         relative: {
@@ -543,13 +601,13 @@ export const CANVAS_TOOLS = [
   },
   {
     name: 'mutate_artifact',
-    description: 'Modifies an existing interactive sandbox simulation or web app in-place. Requires the complete replacement code, not a diff.',
+    description: 'Modifies an existing interactive sandbox app in-place. Requires complete replacement source, not a diff. Source changes never grant network permission; any HTTPS site access still requires separate user approval in the runtime controls.',
     parameters: {
       type: 'object',
       properties: {
         target: { type: 'string', description: 'Exact ID of the target artifact shape to update' },
         title: { type: 'string', description: 'Updated simulation title' },
-        code: { type: 'string', description: 'Updated complete HTML5 + JS code, including unchanged sections' },
+        code: { type: 'string', description: 'Updated complete HTML5 + CSS + JS source, including unchanged sections. Keep it local-first; include HTTPS access only for a site/service explicitly requested by the user. Never include provider/API keys or assume browser CORS can be bypassed.' },
         width: { type: 'number', description: 'Updated viewport width' },
         height: { type: 'number', description: 'Updated viewport height' },
         color: { type: 'string', description: 'Updated color theme' },
@@ -704,7 +762,7 @@ export const CANVAS_TOOLS = [
   },
   {
     name: 'mutate_text',
-    description: 'Updates text content inside a card or note.',
+    description: 'Updates text content inside a note or code card. On a runnable app, this changes only its visible title; use mutate_artifact with a complete revised HTML document to change app source.',
     parameters: {
       type: 'object',
       properties: {
@@ -788,6 +846,75 @@ export const CANVAS_TOOLS = [
         },
       },
       required: ['target'],
+    },
+  },
+  {
+    name: 'create_slide_deck',
+    description: 'Creates an editable presentation deck with complete slide content, speaker notes, distinct layout and theme choices, and structured stats, columns, or timeline data where useful.',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Unique deck ID' },
+        title: { type: 'string', description: 'Presentation title' },
+        subtitle: { type: 'string', description: 'Optional deck subtitle' },
+        theme: { type: 'string', enum: ['midnight', 'paper', 'ocean', 'plum'] },
+        currentSlideIndex: { type: 'integer', description: 'Zero-based starting slide, normally 0' },
+        relative: { type: 'string', description: 'Spatial placement such as center, right_of:<id>, or below:<id>' },
+        slides: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              title: { type: 'string' },
+              subtitle: { type: 'string' },
+              layout: { type: 'string', enum: ['hero', 'split', 'columns', 'stats', 'timeline', 'takeaway'] },
+              content: { type: 'string' },
+              bullets: { type: 'array', items: { type: 'string' } },
+              speakerNotes: { type: 'string' },
+              stats: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' }, change: { type: 'string' } }, required: ['label', 'value'] } },
+              columns: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, text: { type: 'string' }, icon: { type: 'string' } }, required: ['title', 'text'] } },
+              timelineSteps: { type: 'array', items: { type: 'object', properties: { step: { type: 'string' }, title: { type: 'string' }, desc: { type: 'string' } }, required: ['step', 'title', 'desc'] } },
+            },
+            required: ['id', 'title'],
+          },
+        },
+      },
+      required: ['id', 'title', 'slides'],
+    },
+  },
+  {
+    name: 'mutate_slide_deck',
+    description: 'Revises the selected presentation deck in place. Include the complete updated slide list and preserve IDs for retained slides; the host protects the deck from stale or locked writes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', description: 'Exact ID of the selected slide deck' },
+        title: { type: 'string' },
+        subtitle: { type: 'string' },
+        theme: { type: 'string', enum: ['midnight', 'paper', 'ocean', 'plum'] },
+        currentSlideIndex: { type: 'integer', description: 'Optional zero-based active slide index' },
+        slides: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              title: { type: 'string' },
+              subtitle: { type: 'string' },
+              layout: { type: 'string', enum: ['hero', 'split', 'columns', 'stats', 'timeline', 'takeaway'] },
+              content: { type: 'string' },
+              bullets: { type: 'array', items: { type: 'string' } },
+              speakerNotes: { type: 'string' },
+              stats: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' }, change: { type: 'string' } }, required: ['label', 'value'] } },
+              columns: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, text: { type: 'string' }, icon: { type: 'string' } }, required: ['title', 'text'] } },
+              timelineSteps: { type: 'array', items: { type: 'object', properties: { step: { type: 'string' }, title: { type: 'string' }, desc: { type: 'string' } }, required: ['step', 'title', 'desc'] } },
+            },
+            required: ['id', 'title'],
+          },
+        },
+      },
+      required: ['target', 'slides'],
     },
   },
   {
@@ -1117,6 +1244,17 @@ export function isCanvasActionIntent(promptText: string, hasSelectedShapes: bool
   }
 
   return false;
+}
+
+/**
+ * Recognizes direct edit commands that can be rejected before an AI request
+ * when the canvas is read-only, while leaving questions available to chat.
+ */
+export function isExplicitCanvasMutationCommand(promptText: string): boolean {
+  if (typeof promptText !== 'string') return false;
+  return /^(?:(?:please|can you|could you|would you)\s+)*(?:create|draw|generate|build|add|put|place|spawn|remake|rebuild|redesign|recreate|refactor|revamp|update|modify|upgrade|fix|improve|edit|change|tweak|style|restyle|recolor|replace|transform|implement|make\s+(?:real|a|an|this|these|it)|turn\s+(?:this|these|it)\s+into|delete|remove|align|rearrange|organize|connect|link|move|resize|duplicate)\b/i.test(
+    promptText.trim()
+  );
 }
 
 /**

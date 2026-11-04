@@ -1,0 +1,38 @@
+[
+  {
+    "engine": "chromium",
+    "missingKeySetup": true,
+    "noSilentSend": true,
+    "invalidKeyExplicitRequest": true,
+    "sampleUndoRedo": true,
+    "timerStartPauseReset": true,
+    "themeSourceUnchanged": true,
+    "liveFramesSuspended": true,
+    "compactEditor": true,
+    "artifactMenuKeyboard": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "chromium",
+    "blockedStorageManualEntry": true,
+    "sessionDismissal": true
+  },
+  {
+    "engine": "webkit",
+    "missingKeySetup": true,
+    "noSilentSend": true,
+    "invalidKeyExplicitRequest": true,
+    "sampleUndoRedo": true,
+    "timerStartPauseReset": true,
+    "themeSourceUnchanged": true,
+    "liveFramesSuspended": true,
+    "compactEditor": true,
+    "artifactMenuKeyboard": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "webkit",
+    "blockedStorageManualEntry": true,
+    "sessionDismissal": true
+  }
+]

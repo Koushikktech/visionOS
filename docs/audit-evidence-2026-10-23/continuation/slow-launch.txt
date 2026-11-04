@@ -1,0 +1,2 @@
+20-second stalled load exposes bounded manual recovery at320px
+Completing delayed chunk resumes canvas without automatic reload

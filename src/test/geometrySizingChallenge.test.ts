@@ -45,18 +45,18 @@ describe('Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test', () => 
       expect(getInnerConcentricRadius(20, padding)).toBe(12);
     });
 
-    it('verifies SpatialAIOmnibar outer=[32px], inner=16px (rounded-2xl), padding=16px (p-4)', () => {
+    it('verifies SpatialAIOmnibar clamps its compact, expanded, and default widths to the viewport', () => {
       const code = readComponentFile('components/SpatialAIOmnibar.tsx');
-      
-      // Check outer panel declaration
-      expect(code).toContain('rounded-[32px]');
-      
-      // Mathematical verification
-      const innerRadius = 16; // rounded-2xl
-      const padding = 16;     // p-4 = 16px
-      const expectedOuter = getConcentricRadius(innerRadius, padding);
-      expect(expectedOuter).toBe(32);
-      expect(getInnerConcentricRadius(32, padding)).toBe(16);
+
+      expect(code).toContain('const isCompact = viewport.width <= 640;');
+      expect(code).toContain(
+        'const availablePanelWidth = Math.max(\n    0,\n    viewport.width - viewportPadding.left - viewportPadding.right\n  );'
+      );
+      expect(code).toContain(
+        'const panelWidth = Math.min(isCompact ? 520 : isExpanded ? 680 : 480, availablePanelWidth);'
+      );
+      expect(code).toContain('width: panelWidth');
+      expect(code).toContain("isCompact ? 'rounded-[20px]' : 'rounded-[24px]'");
     });
 
     it('verifies AppleFloatingDock popovers adhere to concentric radius formula', () => {
@@ -89,8 +89,8 @@ describe('Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test', () => 
   // =========================================================================
   // 2. Touch Targets & Scale Feedback Verification
   // =========================================================================
-  describe('Touch Targets (>= 40x40px) and Tactile Scale Feedback (active:scale-[0.96])', () => {
-    it('verifies color swatches in ContextualFormattingPill meet >= 40x40px and active:scale-[0.96]', () => {
+  describe('Touch Targets (>= 44x44px) and Tactile Scale Feedback (active:scale-[0.96])', () => {
+    it('verifies color swatches in ContextualFormattingPill meet >= 44x44px and active:scale-[0.96]', () => {
       const code = readComponentFile('components/ContextualFormattingPill.tsx');
       
       // Swatch button class inspection
@@ -98,39 +98,39 @@ describe('Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test', () => 
       expect(swatchSection).not.toBeNull();
       const swatchClasses = swatchSection![1];
       
-      expect(swatchClasses).toContain('min-w-[40px]');
-      expect(swatchClasses).toContain('min-h-[40px]');
-      expect(swatchClasses).toContain('w-10');
-      expect(swatchClasses).toContain('h-10');
+      expect(swatchClasses).toContain('min-w-[44px]');
+      expect(swatchClasses).toContain('min-h-[44px]');
+      expect(swatchClasses).toContain('w-11');
+      expect(swatchClasses).toContain('h-11');
       expect(swatchClasses).toContain('active:scale-[0.96]');
     });
 
-    it('verifies all quick formatting buttons in ContextualFormattingPill meet >= 40x40px and active:scale-[0.96]', () => {
+    it('verifies all quick formatting buttons in ContextualFormattingPill meet >= 44x44px and active:scale-[0.96]', () => {
       const code = readComponentFile('components/ContextualFormattingPill.tsx');
       
       // Stroke weight buttons
-      expect(code).toMatch(/handleSizeChange[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleSizeChange[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
       
       // Fill style buttons
-      expect(code).toMatch(/handleFillChange\('none'\)[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleFillChange\('none'\)[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
       
       // Text align buttons
-      expect(code).toMatch(/handleAlignChange\('start'\)[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleAlignChange\('start'\)[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
       
       // Make Real button
-      expect(code).toMatch(/handleMakeReal[\s\S]*?min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleMakeReal[\s\S]*?min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
       
       // AI Toggle button
-      expect(code).toMatch(/setShowAIActions[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/setShowAIActions[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
       
       // Delete button
-      expect(code).toMatch(/handleDelete[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleDelete[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
       
       // In-situ submit button
-      expect(code).toMatch(/type="submit"[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/type="submit"[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
     });
 
-    it('verifies popover buttons in AppleFloatingDock meet >= 40x40px and active:scale-[0.96]', () => {
+    it('verifies popover buttons in AppleFloatingDock meet >= 44x44px and active:scale-[0.96]', () => {
       const code = readComponentFile('components/AppleFloatingDock.tsx');
       
       // Geo shape popover buttons
@@ -143,7 +143,7 @@ describe('Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test', () => 
       ];
       
       for (const handler of geoButtons) {
-        const regex = new RegExp(`${handler.replace(/[()']/g, '\\$&')}[\\s\\S]*?min-w-\\[40px\\]\\s+min-h-\\[40px\\][\\s\\S]*?active:scale-\\[0\\.96\\]`);
+        const regex = new RegExp(`${handler.replace(/[()']/g, '\\$&')}[\\s\\S]*?min-w-\\[44px\\]\\s+min-h-\\[44px\\][\\s\\S]*?active:scale-\\[0\\.96\\]`);
         expect(code).toMatch(regex);
       }
 
@@ -157,47 +157,41 @@ describe('Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test', () => 
       ];
 
       for (const handler of cardSpawners) {
-        const regex = new RegExp(`${handler.replace(/[()']/g, '\\$&')}[\\s\\S]*?min-h-\\[40px\\][\\s\\S]*?active:scale-\\[0\\.96\\]`);
+        const regex = new RegExp(`${handler.replace(/[()']/g, '\\$&')}[\\s\\S]*?min-h-\\[44px\\][\\s\\S]*?active:scale-\\[0\\.96\\]`);
         expect(code).toMatch(regex);
       }
     });
 
-    it('verifies slide thumbnail pager dots in SlideDeckShapeUtil meet >= 40x40px and active:scale-[0.96]', () => {
+    it('verifies the slide pager exposes accessible 44px previous, next, and numeric controls', () => {
       const code = readComponentFile('shapes/SlideDeckShapeUtil.tsx');
-      
-      // Thumbnail dots button
-      const dotButtonMatch = code.match(/aria-label=\{`Jump to slide \$\{idx \+ 1\}`\}[\s\S]*?className="([^"]*)"/);
-      expect(dotButtonMatch).not.toBeNull();
-      const dotClasses = dotButtonMatch![1];
-      
-      expect(dotClasses).toContain('min-w-[40px]');
-      expect(dotClasses).toContain('min-h-[40px]');
-      expect(dotClasses).toContain('active:scale-[0.96]');
-      
-      // Pager navigation buttons
-      expect(code).toMatch(/handlePrev[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/handleNext[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/handleCopyMarkdown[\s\S]*?min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+
+      expect(code).toContain('aria-label="Previous slide"');
+      expect(code).toContain('aria-label="Next slide"');
+      expect(code).toContain('aria-label="Go to slide number"');
+      expect(code).toMatch(/min-h-\[44px\] min-w-\[44px\][\s\S]{0,200}aria-label="Previous slide"/);
+      expect(code).toMatch(/min-h-\[44px\] min-w-\[44px\][\s\S]{0,200}aria-label="Next slide"/);
+      expect(code).toContain('inputMode="numeric"');
+      expect(code).toMatch(/aria-label="Go to slide number"[\s\S]{0,500}className="h-11 w-16/);
     });
 
-    it('verifies SpatialAIOmnibar top controls and action menu buttons meet >= 40x40px and active:scale-[0.96]', () => {
+    it('verifies SpatialAIOmnibar top controls and action menu buttons meet >= 44x44px and active:scale-[0.96]', () => {
       const code = readComponentFile('components/SpatialAIOmnibar.tsx');
       
       // Top circular controls
-      expect(code).toMatch(/handleNewChat[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/setShowSettings[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/setIsExpanded[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/setIsOpen\(false\)[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleNewChat[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/setShowProviderSetup[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/setIsExpanded[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/setIsOpen\(false\)[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
       
       // Action menu presets in Action Menu popover
       const actionMenuSection = code.match(/Action Menu Popover[\s\S]*?handleActionPreset\(item\.prompt\)[\s\S]*?className="([^"]*)"/);
       expect(actionMenuSection).not.toBeNull();
       const actionClasses = actionMenuSection![1];
-      expect(actionClasses).toContain('min-h-[40px]');
+      expect(actionClasses).toContain('min-h-[44px]');
       expect(actionClasses).toContain('active:scale-[0.96]');
 
       // Quick starters in empty state
-      const quickStarterSection = code.match(/quickStarters\.map\([\s\S]*?handleActionPreset\(item\.prompt\)[\s\S]*?className="([^"]*)"/);
+      const quickStarterSection = code.match(/quickStarters(?:\.slice\(0, 2\))?\.map\([\s\S]*?handleActionPreset\(item\.prompt\)[\s\S]*?className="([^"]*)"/);
       expect(quickStarterSection).not.toBeNull();
       const quickClasses = quickStarterSection![1];
       expect(quickClasses).toContain('p-3');
@@ -209,23 +203,25 @@ describe('Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test', () => 
   // 3. Tabular Numbers Verification
   // =========================================================================
   describe('Tabular Numbers: font-variant-numeric: tabular-nums', () => {
-    it('verifies tabular-nums is present on st.value and st.change in SlideDeckShapeUtil.tsx', () => {
+    it('verifies tabular numerals are applied to displayed stat values and slide indexes', () => {
       const code = readComponentFile('shapes/SlideDeckShapeUtil.tsx');
-      
-      // Value metric verification
-      const valueMatch = code.match(/<span[^>]*tabular-nums[^>]*>\{st\.value\}<\/span>/);
-      expect(valueMatch).not.toBeNull();
-      
-      // Change metric verification
-      const changeMatch = code.match(/\{st\.change\s*&&[\s\S]*?<span[^>]*tabular-nums[^>]*>[\s\S]*?\{st\.change\}[\s\S]*?<\/span>/);
-      expect(changeMatch).not.toBeNull();
+      const statValueIndex = code.indexOf('{stat.value}');
+      const statClassStart = code.lastIndexOf('className=', statValueIndex);
+      expect(statValueIndex).toBeGreaterThanOrEqual(0);
+      expect(code.slice(statClassStart, statValueIndex)).toContain('tabular-nums');
+
+      const slidesNavStart = code.indexOf('aria-label="Slides"');
+      const slideIndex = code.indexOf('{index + 1}', slidesNavStart);
+      const slideClassStart = code.lastIndexOf('className=', slideIndex);
+      expect(slidesNavStart).toBeGreaterThanOrEqual(0);
+      expect(slideIndex).toBeGreaterThanOrEqual(slidesNavStart);
+      expect(code.slice(slideClassStart, slideIndex)).toContain('tabular-nums');
     });
 
-    it('verifies SlideDeckShapeUtil contains at least 4 occurrences of tabular-nums', () => {
+    it('keeps tabular numeral styling on numeric display elements without depending on an occurrence count', () => {
       const code = readComponentFile('shapes/SlideDeckShapeUtil.tsx');
-      const matches = code.match(/tabular-nums/g);
-      expect(matches).not.toBeNull();
-      expect(matches!.length).toBeGreaterThanOrEqual(4);
+      expect(code).toMatch(/font-bold tabular-nums[^>]*>\{stat\.value\}<\/p>/);
+      expect(code).toMatch(/text-\[10px\] tabular-nums[^>]*>\{index \+ 1\}<\/span>/);
     });
 
     it('verifies global CSS defines .tabular-nums correctly', () => {

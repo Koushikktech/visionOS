@@ -1,0 +1,13 @@
+[
+  {
+    "engine": "Chromium",
+    "staleCallbacksIgnored": true,
+    "singleFlightPermission": true,
+    "replacementMicRetained": true,
+    "closedMicReleased": true,
+    "caretInsertion": true,
+    "manualDraftProtected": true,
+    "deniedPendingMicReleased": true,
+    "pageErrors": []
+  }
+]

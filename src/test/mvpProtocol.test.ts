@@ -99,9 +99,18 @@ describe('MVP protocol behavior', () => {
   it('serializes hierarchy, z-order, document sections and real arrow bindings', () => {
     const shapes = [
       {
+        id: 'shape:frame',
+        type: 'frame',
+        parentId: 'page:1',
+        isLocked: true,
+        rotation: 0,
+        props: { w: 700, h: 900, name: 'Locked frame' },
+      },
+      {
         id: 'shape:doc',
         type: 'document',
         parentId: 'shape:frame',
+        isLocked: false,
         rotation: 0.2,
         props: {
           title: 'Plan',
@@ -112,12 +121,15 @@ describe('MVP protocol behavior', () => {
         id: 'shape:arrow',
         type: 'arrow',
         parentId: 'page:1',
+        isLocked: false,
         rotation: 0,
         props: {},
       },
     ];
     const editor: any = {
+      getCurrentPageId: () => 'page:1',
       getCurrentPageShapesSorted: () => shapes,
+      getShape: (id: string) => shapes.find((shape) => shape.id === id),
       getShapePageBounds: () => ({
         minX: -100,
         minY: 200,
@@ -130,13 +142,14 @@ describe('MVP protocol behavior', () => {
       ],
     };
     const nodes = serializeCanvas(editor);
-    expect(nodes[0].sections?.[0].content).toBe('Full document');
-    expect(nodes[0].parentId).toBe('shape:frame');
-    expect(nodes[0].rotation).toBe(0.2);
-    expect(nodes[1].zIndex).toBe(1);
-    expect(nodes[1].from).toBe('shape:doc');
-    expect(nodes[1].to).toBe('shape:end');
-    expect(compactBoard(nodes)[0]).not.toHaveProperty('sections');
+    expect(nodes[1].sections?.[0].content).toBe('Full document');
+    expect(nodes[1].parentId).toBe('shape:frame');
+    expect(nodes[1].rotation).toBe(0.2);
+    expect(nodes[1].isLocked).toBe(true);
+    expect(nodes[2].zIndex).toBe(2);
+    expect(nodes[2].from).toBe('shape:doc');
+    expect(nodes[2].to).toBe('shape:end');
+    expect(compactBoard(nodes)[1]).not.toHaveProperty('sections');
     expect(contentRevision({ content: 'A' })).not.toBe(
       contentRevision({ content: 'B' })
     );

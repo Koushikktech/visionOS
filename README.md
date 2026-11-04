@@ -6,8 +6,8 @@
 
 [![Next.js 15](https://img.shields.io/badge/Next.js-15.5-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19-blue?style=flat&logo=react)](https://react.dev/)
-[![TypeScript 5](https://img.shields.io/badge/TypeScript-5.8-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
-[![tldraw v3](https://img.shields.io/badge/tldraw-v3.8-purple?style=flat)](https://tldraw.dev/)
+[![TypeScript 5](https://img.shields.io/badge/TypeScript-5.9-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
+[![tldraw v3](https://img.shields.io/badge/tldraw-v3.15.6-purple?style=flat)](https://tldraw.dev/)
 [![Bun](https://img.shields.io/badge/Bun-1.3-orange?style=flat&logo=bun)](https://bun.sh/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
@@ -30,7 +30,8 @@ Inspired by Apple visionOS and macOS Sequoia liquid glass aesthetics, the interf
 ### 1. 🪄 Make Real: Sketch to Live Interactive Sandbox
 - Select any hand-drawn wireframe, sketch, or group of shapes and click **Make Real** (or press `Cmd+K` and ask the assistant).
 - visionOS extracts spatial bounds and SVG/raster context, feeds it to a multimodal vision model (Gemini / GPT-4o), and synthesizes a full, self-contained HTML5/CSS/JavaScript web application placed cleanly on the canvas.
-- Live apps run in sandboxed, opaque-origin iframes with an isolated virtual `localStorage` bridge so apps retain state across canvas moves, zooms, and page reloads without leaking data to other shapes.
+- Live apps run in a layered opaque-origin iframe preview with an isolated virtual `localStorage` bridge so apps retain state across canvas moves, zooms, and page reloads without sharing storage with other shapes.
+- External site access starts off. When the app requests a site, review its exact HTTPS origin and allow it for this run or remember it for this code version. Scripts from an allowed site can read the app's saved data and send it to that site. Imported apps stay paused; source edits and workspace restores reset grants. Forms and embedded sites remain blocked. Clicked HTTPS links require a separate host confirmation.
 
 ### 2. 🧠 Spatial Intelligence Omnibar (`Cmd+K`)
 - **macOS Sequoia Siri-Inspired HUD**: Floating obsidian liquid glass panel with circular dismiss/expand controls, smooth spring animations, and quiet visual polish.
@@ -58,13 +59,21 @@ Inspired by Apple visionOS and macOS Sequoia liquid glass aesthetics, the interf
 
 ### 6. 🛡️ Privacy-First First-Time Onboarding
 - First-time users are greeted with an interactive visionOS onboarding modal.
-- Users can provide their own Google AI Studio API key directly in the browser.
-- **Zero Server Key Storage**: Client-provided keys are saved *strictly* inside the browser's local storage and are never exposed or transmitted to any third party.
-- Pre-configured presets for `gemini-3.8-flash` (recommended default), `gemini-3.5-flash-lite`, and `gemini-4-argon`, plus OpenRouter.
+- Users can provide their own Google Gemini, OpenAI, or OpenRouter API key directly in the browser. OpenAI access uses an OpenAI API key; ChatGPT subscription sign-in is not supported.
+- **Browser-held BYOK**: Keys use this browser's local storage when available, fall back to the current tab session when persistent storage is blocked, or remain in memory only when browser storage is unavailable. AI requests send the key and relevant canvas context to this app's server, which forwards them to the selected provider. The production test deployment ignores host provider keys.
+- Pre-configured presets for `gemini-3.8-flash` (recommended default), `gemini-3.5-flash-lite`, and `gemini-4-argon`, plus OpenAI and OpenRouter.
 
 ### 7. ⏪ Single-Tick Atomic Undo/Redo (`Cmd+Z`)
 - Every multi-node layout or AI operation is batched inside an atomic CRDT transaction (`editor.store.atomic()`).
 - Pressing `Cmd+Z` rolls back the entire AI action cleanly in one tick without disturbing previous user actions.
+
+## On-device canvas recovery
+
+The **Export** menu's **On-device recovery** status reports **Checking recovery copy**, **Saving recovery copy**, and **Recovery copy saved on this device**. “Saved” means the app-owned IndexedDB recovery transaction committed the board records; it is separate from tldraw's private native persistence acknowledgement. A mismatch or storage error is shown without automatically replacing either copy. Review both snapshots before choosing **Keep current** or **Restore recovery**; the choices are fenced to the reviewed copy revision and live canvas snapshot. Restore saves the current workspace first so **Restore previous** remains available.
+
+Use **Export → Download workspace backup** for a portable versioned workspace backup. The on-device recovery copy contains canvas records and asset references, not packaged media bytes. Version 2 downloads include supported app virtual storage, package supported local media, and report exclusions for items that could not be embedded. Provider keys, chat history, and app preferences are not included. This recovery is local to the current browser profile: clearing site data or browser storage eviction can remove it. Abrupt termination before the recovery transaction commits is not guaranteed to preserve the latest edits.
+
+The recovery copy is bounded to 50,000 records and 25 MB of board records, with a 16 MB pending-change queue. If a limit or browser-storage failure is reached, the canvas remains usable but the status asks you to download a workspace backup. Automatic restore requires browser Web Locks support and fails closed when that coordination is unavailable.
 
 ---
 
@@ -75,7 +84,7 @@ Inspired by Apple visionOS and macOS Sequoia liquid glass aesthetics, the interf
 │                              AUTONOMOUS SPATIAL HARNESS                                │
 │                                                                                        │
 │   • 2D R-Tree Spatial Indexing (rbush): Extracts selected shapes + 1.3x active viewport │
-│   • Gemini / OpenRouter Streaming SSE: High-throughput token streaming & tool parsing  │
+│   • Gemini, OpenAI, OpenRouter SSE: token streaming & tool parsing                  │
 │   • Thinking Engine: Upstream thinking budget parsing (<thought> streaming blocks)     │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            │ (NDJSON Token Stream / SAP Frames)
@@ -127,18 +136,25 @@ Inspired by Apple visionOS and macOS Sequoia liquid glass aesthetics, the interf
    cp .env.example .env.local
    ```
 
-   Add your Google AI Studio or OpenRouter API key:
+   For the test deployment, leave provider keys blank. Testers add their own Gemini, OpenAI, or OpenRouter API key in onboarding/settings. OpenAI access uses an OpenAI API key; ChatGPT subscription sign-in is not supported. For local development only, you may opt into a server key by setting `ALLOW_SERVER_AI_KEYS=true` and configuring a provider key; this opt-in is ignored in production.
+
+   Example local-only configuration:
    ```env
-   # Google AI Studio API Key (Get free key: https://aistudio.google.com/app/apikey)
-   GEMINI_API_KEY=your_gemini_api_key_here
+   # Optional local server-funded development. Do not use on deployed test instances.
+   ALLOW_SERVER_AI_KEYS=true
+   GEMINI_API_KEY=your_local_development_key
    GEMINI_MODEL=gemini-3.8-flash
+
+   # Optional: OpenAI API key for local development
+   OPENAI_API_KEY=
+   OPENAI_MODEL=gpt-4o
 
    # Optional: OpenRouter API Key (https://openrouter.ai/keys)
    OPENROUTER_API_KEY=
    OPENROUTER_MODEL=openai/gpt-4o
    ```
 
-   > **Note:** If you do not configure server-side keys in `.env.local`, you can still enter your Gemini API key directly into the client-side Onboarding Modal upon launching the app. The key is securely stored in your browser's `localStorage`.
+   > **Note:** The app's deployed test instance is BYOK-only. Provider keys stored in deployment environment variables are not used in production, even if present. Each tester enters their own key. It is stored persistently in that browser when possible, in the current tab session if persistent storage is blocked, or in memory if browser storage is unavailable. The key and relevant canvas context are sent to the app API for forwarding to the selected provider.
 
 4. **Start the development server:**
    ```bash
@@ -152,10 +168,10 @@ Inspired by Apple visionOS and macOS Sequoia liquid glass aesthetics, the interf
 
 ## 🧪 Testing & Verification
 
-visionOS is covered by a comprehensive 244-test automated verification suite verifying concentric geometry, tactile hit-targets, token boundaries, markdown fence sanitization, and spatial solver algorithms.
+At the latest 27 Oct 2026 checkpoint, 454 tests passed across 48 files with zero failures; typecheck and production build passed. The earlier 429-test / 45-file checkpoint is retained in the audit history. These checks are local evidence, not a deployed-service or physical-device certification.
 
 ```bash
-# Run complete test suite (244 tests)
+# Run the test suite (latest 27 Oct checkpoint: 454 passed across 48 files)
 bun test
 
 # Run TypeScript typecheck
@@ -164,6 +180,10 @@ bun run typecheck
 # Run production build
 bun run build
 ```
+
+### Latest local browser verification — 27 Oct 2026
+
+Production Chromium and headless WebKit passed the responsive editor matrix, dock selection/focus-return checks, rotated-geometry mutations, controlled action/backup rollback, worker race guards, dummy-key storage scenarios, and the exercised generated-app permission flows. Exact-site approval, denial of unapproved destinations, storage preservation across a permission reload, manual confirmation for clicked external links, remembering and revoking grants, and source-change revocation were checked locally. At canvas zoom 33%, the unscaled Website access toolbar action measured 44×44 CSS pixels. The permission evidence note records scope and limits. A synthetic dictation fixture passed in Chromium; the WebKit audio fixture is still under investigation. CDN-hosted fonts and translations depend on network availability: an early reload that canceled those requests emitted WebKit load diagnostics, while waiting for `networkidle` produced no app changes or fatal error. Physical iPad/Safari/Pencil/VoiceOver, live provider calls, and deployed behavior remain unverified. See the [Oct 27 audit and evidence index](docs/PRODUCTION_AUDIT_PLAN.md), [browser evidence README](docs/audit-evidence-2026-10-27/README.md), and generated-app [network permission evidence](docs/audit-evidence-2026-10-27/network-permissions/README.md).
 
 ---
 
@@ -177,15 +197,12 @@ visionOS is engineered for production deployment on [Vercel](https://vercel.com)
 2. Go to [Vercel](https://vercel.com/new) and click **Import Project**.
 3. Select your `visionOS` repository.
 4. Set the Framework Preset to **Next.js** (detected automatically).
-5. Add the following **Environment Variables** under Project Settings:
-   - `GEMINI_API_KEY`: Your Google AI Studio API key.
-   - `GEMINI_MODEL`: `gemini-3.8-flash` (or your preferred model).
-   - *(Optional)* `OPENROUTER_API_KEY`: Your OpenRouter key.
+5. Optionally set `GEMINI_MODEL`, `OPENAI_MODEL`, and `OPENROUTER_MODEL` under Project Settings. Do not configure provider API keys for the test deployment; each tester supplies their own key in the app.
 6. Click **Deploy**.
 
 ### Production Vercel Notes
 - **Serverless Streaming**: Next.js App Router streaming endpoints (`/api/ai/chat` and `/api/ai/make-real`) use server-sent events (SSE). Vercel natively supports streaming on standard and Pro plans.
-- **Client Key Option**: Even if you leave `GEMINI_API_KEY` blank on Vercel, users will be prompted by the interactive Onboarding Modal to enter their own API key, allowing you to host a completely zero-cost public or demo instance without exposing your personal API quota!
+- **BYOK test deployment**: Provider environment keys are ignored in production. Users are prompted by onboarding to enter their own key; the app forwards each request to the chosen provider using that key. This keeps the test instance from spending a host-owned provider quota.
 
 ---
 
@@ -236,13 +253,14 @@ visionOS/
 
 ## 🔒 Security & Privacy
 
-- **Opaque-Origin Iframe Sandboxing**: All AI-synthesized interactive applications run inside `<iframe sandbox="allow-scripts allow-forms allow-modals">` on an opaque origin. The parent canvas DOM, cookies, and tokens are completely inaccessible to generated apps.
+- **Generated-app preview boundary**: A trusted opaque-origin wrapper hosts each generated app in a nested Blob-backed iframe. The tested outer boundary disallows forms, popups, and top-level navigation; the parent canvas DOM and cookies are not exposed to app code. This is a browser boundary, not a guarantee that every network-capable API is contained.
+- **Exact-site permissions**: HTTPS resources and HTTPS/WSS connections are blocked unless the user approves an exact origin, including its port. Remembered grants are stored in this browser and bound to the workspace, app shape, restore epoch, and exact source version; they are not part of the board or its backups. A clicked HTTPS link is shown to the user before it opens. Peer-to-peer APIs are a separate advanced option and are only best-effort blocked in browser previews; WebRTC may bypass the runtime guard. Do not treat this preview as a complete network firewall or as offline.
 - **Virtual LocalStorage Isolation**: Generated apps receive an isolated, key-value virtual storage layer managed by the host. An app cannot access or tamper with data belonging to other canvas apps.
-- **Zero Server Key Exposure**: Environment variables without `NEXT_PUBLIC_` remain strictly on the server. Client-provided keys never leave the browser except via encrypted direct HTTPS requests to provider endpoints.
-- **Single-Tenant & Privacy**: Full canvas states and user chats reside strictly in the browser's indexed/local storage.
+- **Provider credentials and requests**: Environment variables without `NEXT_PUBLIC_` stay on the server. A browser-entered key is stored in local storage where available, otherwise in the current tab session or memory only, and is sent with relevant canvas context to this app's API; the server forwards the request to the selected provider. The app does not put Gemini keys in provider request URLs. Settings indicate the active persistence level and warn if a removal could not clear a saved copy.
+- **Local-first data**: Workspace state and chat history are stored in the browser. AI requests send the prompt and relevant canvas context to this app's server and provider; some workflows may also include a canvas snapshot. Voice dictation uses the browser's speech-recognition service, whose data handling depends on the browser and its provider. Remove keys in settings; if browser storage prevented a saved copy from being cleared, the UI warns that it could return after reload.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+The visionOS project code is licensed under the [MIT License](LICENSE). The `@tldraw/tldraw` v3.15.6 dependency has its own license; its required verbatim notice is included in [THIRD_PARTY_NOTICES/tldraw-3.15.6-LICENSE.md](THIRD_PARTY_NOTICES/tldraw-3.15.6-LICENSE.md). The project MIT license does not replace that dependency license.

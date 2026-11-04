@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { stripMarkdownFences } from '@/shapes/ArtifactShapeUtil';
+import { buildArtifactSrcDoc } from '@/lib/artifactRuntime';
 
 describe('Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts)', () => {
   it('leaves pure HTML untouched without modification', () => {
@@ -82,17 +83,30 @@ I hope this meets your needs! Let me know if you want adjustments.`;
   });
 
   describe('Interactive App Iframe Pinch-to-Zoom Interception & Camera Anchoring', () => {
-    it('verifies that the artifact source code contains the pinch-zoom message interceptor and safari gesture suppressors', async () => {
+    it('emits the pinch/wheel and Safari gesture bridge before app code and validates it in the host', async () => {
       const fs = await import('fs');
       const fileContent = fs.readFileSync('src/shapes/ArtifactShapeUtil.tsx', 'utf-8');
+      const srcDoc = buildArtifactSrcDoc(
+        '<script>window.appStarted = true;</script>',
+        'shape:pinch-test',
+        {},
+        []
+      );
 
-      expect(fileContent).toContain('CANVASOS_IFRAME_PINCH_ZOOM');
-      expect(fileContent).toContain('window.addEventListener(\'wheel\'');
-      expect(fileContent).toContain('e.ctrlKey || e.metaKey');
-      expect(fileContent).toContain('preventSafariGesture');
-      expect(fileContent).toContain('window.addEventListener(\'gesturestart\'');
-      expect(fileContent).toContain('window.addEventListener(\'gesturechange\'');
-      expect(fileContent).toContain('window.addEventListener(\'gestureend\'');
+      expect(srcDoc).toContain("window.addEventListener('wheel'");
+      expect(srcDoc).toContain('e.ctrlKey || e.metaKey');
+      expect(srcDoc).toContain('CANVASOS_IFRAME_PINCH_ZOOM');
+      expect(srcDoc).toContain('function preventSafariGesture(e)');
+      expect(srcDoc).toContain("window.addEventListener('gesturestart'");
+      expect(srcDoc).toContain("window.addEventListener('gesturechange'");
+      expect(srcDoc).toContain("window.addEventListener('gestureend'");
+      expect(srcDoc.indexOf("window.addEventListener('wheel'")).toBeLessThan(
+        srcDoc.indexOf('<script>window.appStarted = true;')
+      );
+
+      expect(fileContent).toContain('event.source !== iframeWindow');
+      expect(fileContent).toContain("event.data.type === 'CANVASOS_IFRAME_PINCH_ZOOM'");
+      expect(fileContent).toContain("window.addEventListener('message', handleMessage)");
     });
 
     it('mathematically proves anchor point invariance during canvas zoom under cursor', () => {

@@ -229,143 +229,146 @@ describe('Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite'
   });
 
   // =========================================================================
-  // 2. Touch Target Dimensions & Tactile Scale Feedback (>= 40x40px, scale-[0.96])
+  // 2. Touch Target Dimensions & Tactile Scale Feedback (>= 44x44px, scale-[0.96])
   // =========================================================================
-  describe('Touch Targets (>= 40x40px) and Tactile Feedback (scale-[0.96])', () => {
-    it('verifies ApplePagesPill interactive buttons meet >= 40x40px and scale-[0.96]', () => {
+  describe('Touch Targets (>= 44x44px) and Tactile Feedback (scale-[0.96])', () => {
+    it('verifies ApplePagesPill interactive buttons meet >= 44x44px and scale-[0.96]', () => {
       const code = readComponentFile('components/ApplePagesPill.tsx');
 
-      // 1. Current Page Selector: min-h-[40px] and whileTap scale 0.96
-      expect(code).toContain('min-h-[40px]');
+      // 1. Current Page Selector: min-h-[44px] and whileTap scale 0.96
+      expect(code).toContain('min-h-[44px]');
       expect(code).toContain('whileTap={{ scale: 0.96 }}');
 
-      // 2. Grid Toggle: min-w-[40px] min-h-[40px] w-10 h-10 active:scale-[0.96]
-      expect(code).toMatch(/handleToggleGrid[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      // 2. Grid Toggle: min-w-[44px] min-h-[44px] w-11 h-11 active:scale-[0.96]
+      expect(code).toMatch(/handleToggleGrid[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
-      // 3. Snap Toggle: min-w-[40px] min-h-[40px] w-10 h-10 active:scale-[0.96]
-      expect(code).toMatch(/handleToggleSnap[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      // 3. Snap Toggle: min-w-[44px] min-h-[44px] w-11 h-11 active:scale-[0.96]
+      expect(code).toMatch(/handleToggleSnap[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
-      // 4. Export Dropdown Trigger: min-w-[40px] min-h-[40px] w-10 h-10 active:scale-[0.96]
-      expect(code).toMatch(/setShowExportMenu[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      // 4. Export Dropdown Trigger: min-w-[44px] min-h-[44px] w-11 h-11 active:scale-[0.96]
+      expect(code).toMatch(/setShowExportMenu[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
-      // 5. Export Popover Options (PNG, SVG, backups): min-h-[40px] active:scale-[0.96]
-      expect(code).toMatch(/handleExport\('png'\)[\s\S]*?min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/handleExport\('svg'\)[\s\S]*?min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/downloadBackup[\s\S]*?min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      // 5. Export Popover Options (PNG, SVG, backups): min-h-[44px] active:scale-[0.96]
+      expect(code).toMatch(/handleExport\('png'\)[\s\S]*?min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleExport\('svg'\)[\s\S]*?min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/downloadBackup[\s\S]*?min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
 
-      // 6. New Page button: min-h-[40px] active:scale-[0.96]
-      expect(code).toMatch(/handleCreatePage[\s\S]*?min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      // 6. New Page button: min-h-[44px] active:scale-[0.96]
+      expect(code).toMatch(/handleCreatePage[\s\S]*?min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
 
       // 7. Page item Rename Save, Hover Rename, Duplicate, Delete
-      expect(code).toMatch(/handleSaveRename[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/handleStartRename[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/handleDuplicatePage[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/handleDeletePage[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleSaveRename[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleStartRename[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleDuplicatePage[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleDeletePage[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
     });
 
-    it('verifies AppleViewportPill interactive buttons meet >= 40x40px and active:scale-[0.96]', () => {
+    it('verifies AppleViewportPill interactive buttons meet >= 44x44px and active:scale-[0.96]', () => {
       const code = readComponentFile('components/AppleViewportPill.tsx');
 
       // Zoom Out
-      expect(code).toMatch(/handleZoomOut[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleZoomOut[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
       // Zoom Reset (percentage display button)
-      expect(code).toMatch(/handleResetZoom[\s\S]*?min-w-\[50px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleResetZoom[\s\S]*?min-w-\[50px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
 
       // Zoom In
-      expect(code).toMatch(/handleZoomIn[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleZoomIn[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
       // Zoom to Fit
-      expect(code).toMatch(/handleZoomToFit[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleZoomToFit[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
       // Undo
-      expect(code).toMatch(/handleUndo[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleUndo[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
       // Redo
-      expect(code).toMatch(/handleRedo[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleRedo[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
     });
 
-    it('verifies ContextualFormattingPill buttons meet >= 40x40px and active:scale-[0.96]', () => {
+    it('verifies ContextualFormattingPill buttons meet >= 44x44px and active:scale-[0.96]', () => {
       const code = readComponentFile('components/ContextualFormattingPill.tsx');
 
       // Palette swatches
-      expect(code).toMatch(/HUD_COLOR_SWATCHES\.map[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/HUD_COLOR_SWATCHES\.map[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
       // Stroke size options
-      expect(code).toMatch(/handleSizeChange[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleSizeChange[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
       // Fill style options
-      expect(code).toMatch(/handleFillChange[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleFillChange[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
 
       // Text align options
-      expect(code).toMatch(/handleAlignChange[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleAlignChange[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
 
       // Make Real CTA
-      expect(code).toMatch(/handleMakeReal[\s\S]*?min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleMakeReal[\s\S]*?min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
 
       // AI Actions toggle
-      expect(code).toMatch(/setShowAIActions[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/setShowAIActions[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
       // Delete button
-      expect(code).toMatch(/handleDelete[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleDelete[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
       // Dismiss button
-      expect(code).toMatch(/setIsDismissed\(true\)[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/setIsDismissed\(true\)[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
       // In-situ submit
-      expect(code).toMatch(/type="submit"[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/type="submit"[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
     });
 
-    it('verifies AppleFloatingDock primary tools and popovers meet >= 40x40px and active:scale-[0.96]', () => {
+    it('verifies AppleFloatingDock primary tools and popovers meet >= 44x44px and active:scale-[0.96]', () => {
       const code = readComponentFile('components/AppleFloatingDock.tsx');
 
       // Primary tools (10)
       const primaryTools = ['select', 'hand', 'draw', 'text', 'note', 'geo', 'rich_card', 'arrow', 'eraser', 'clear'];
       for (const tool of primaryTools) {
-        expect(code).toMatch(new RegExp(`data-tool="${tool}"[\\s\\S]*?min-w-\\[40px\\]\\s+min-h-\\[40px\\]\\s+w-10\\s+h-10[\\s\\S]*?active:scale-\\[0\\.96\\]`));
+        expect(code).toMatch(new RegExp(`data-tool="${tool}"[\\s\\S]*?min-w-\\[44px\\]\\s+min-h-\\[44px\\]\\s+w-11\\s+h-11[\\s\\S]*?active:scale-\\[0\\.96\\]`));
       }
 
       // Geo popover shapes
-      expect(code).toMatch(/handleSelectGeo\('rectangle'\)[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/handleSelectGeo\('ellipse'\)[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/handleSelectGeo\('triangle'\)[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/handleSelectGeo\('diamond'\)[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/handleSelectGeo\('star'\)[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleSelectGeo\('rectangle'\)[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleSelectGeo\('ellipse'\)[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleSelectGeo\('triangle'\)[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleSelectGeo\('diamond'\)[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleSelectGeo\('star'\)[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11[\s\S]*?active:scale-\[0\.96\]/);
 
       // Custom card spawners
       const cardTypes = ['rich_card', 'code_card', 'document', 'slide_deck', 'artifact'];
       for (const ct of cardTypes) {
-        expect(code).toMatch(new RegExp(`handleSpawnCard\\('${ct}'\\)[\\s\\S]*?min-h-\\[40px\\][\\s\\S]*?active:scale-\\[0\\.96\\]`));
+        expect(code).toMatch(new RegExp(`handleSpawnCard\\('${ct}'\\)[\\s\\S]*?min-h-\\[44px\\][\\s\\S]*?active:scale-\\[0\\.96\\]`));
       }
 
       // Sub-chooser close button
-      expect(code).toMatch(/onClick=\{closeAllPopovers\}[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\]\s+w-10\s+h-10[\s\S]*?active:scale-\[0\.96\]/);
+      const subChooserCloseButton = code.match(/<button\s+type="button"\s+title="Close"[\s\S]*?<\/button>/)?.[0];
+      expect(subChooserCloseButton).toMatch(/onClick=\{\(\) => \{\s*closeAllPopovers\(\);\s*anchorRef\.current\?\.focus\(\);\s*\}\}/);
+      expect(subChooserCloseButton).toMatch(/min-w-\[44px\]\s+min-h-\[44px\]\s+w-11\s+h-11/);
+      expect(subChooserCloseButton).toMatch(/active:scale-\[0\.96\]/);
     });
 
-    it('verifies SpatialAIOmnibar controls meet >= 40x40px and active:scale-[0.96]', () => {
+    it('verifies SpatialAIOmnibar controls meet >= 44x44px and active:scale-[0.96]', () => {
       const code = readComponentFile('components/SpatialAIOmnibar.tsx');
 
       // Top circular buttons
-      expect(code).toMatch(/handleNewChat[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/setShowSettings[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/setIsExpanded[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/setIsOpen\(false\)[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleNewChat[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/setShowProviderSetup[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/setIsExpanded[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/setIsOpen\(false\)[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
 
       // Copy message button
-      expect(code).toMatch(/handleCopy[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/handleCopy[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
 
       // Thinking Accordion button
-      expect(code).toMatch(/Reasoning Chain[\s\S]*?min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/Reasoning Chain[\s\S]*?min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
 
       // Action menu (+) button
-      expect(code).toMatch(/setShowActionMenu[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/setShowActionMenu[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
 
       // Voice dictation button
-      expect(code).toMatch(/toggleVoice[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/toggleVoice[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
 
       // Send / stop button
-      expect(code).toMatch(/ai\.stopGeneration[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
-      expect(code).toMatch(/type="submit"[\s\S]*?min-w-\[40px\]\s+min-h-\[40px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/ai\.stopGeneration[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
+      expect(code).toMatch(/type="submit"[\s\S]*?min-w-\[44px\]\s+min-h-\[44px\][\s\S]*?active:scale-\[0\.96\]/);
     });
 
     it('verifies zero occurrences of scale-[0.98] across all source files in src/', () => {
@@ -467,13 +470,6 @@ describe('Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite'
         description: 'rounded-[24px] outer with p-3 (12px) and rounded-xl (12px) page list items',
       },
       {
-        component: 'SpatialAIOmnibar Panel',
-        outerRadius: 32,
-        innerRadius: 16,
-        padding: 16,
-        description: 'rounded-[32px] outer with p-4 (16px) and rounded-2xl (16px) chat message cards',
-      },
-      {
         component: 'SpatialAIOmnibar Action Menu Popover',
         outerRadius: 20,
         innerRadius: 12,
@@ -508,8 +504,14 @@ describe('Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite'
       expect(pill).toContain('p-1.5');
 
       const viewport = readComponentFile('components/AppleViewportPill.tsx');
-      expect(viewport).toContain('rounded-[18px]');
+      expect(viewport).toContain('data-canvas-chrome="viewport"');
       expect(viewport).toContain('p-1.5');
+
+      const globals = readComponentFile('app/globals.css');
+      expect(globals).toContain('--radius-inner-md: 12px;');
+      expect(globals).toContain('--radius-pad-content: 6px;');
+      expect(globals).toContain("[data-canvas-chrome='viewport']");
+      expect(globals).toContain('border-radius: calc(var(--radius-inner-md) + var(--radius-pad-content));');
 
       const pages = readComponentFile('components/ApplePagesPill.tsx');
       expect(pages).toContain('rounded-[24px]');
@@ -517,8 +519,12 @@ describe('Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite'
       expect(pages).toContain('rounded-[20px]');
 
       const omnibar = readComponentFile('components/SpatialAIOmnibar.tsx');
-      expect(omnibar).toContain('rounded-[32px]');
-      expect(omnibar).toContain('rounded-[20px]');
+      expect(omnibar).toMatch(/const availablePanelWidth = Math\.max\(\s*0,\s*viewport\.width - viewportPadding\.left - viewportPadding\.right\s*\);/);
+      expect(omnibar).toMatch(/const panelWidth = Math\.min\(isCompact \? 520 : isExpanded \? 680 : 480,\s*availablePanelWidth\);/);
+      expect(omnibar).toMatch(/width:\s*panelWidth/);
+      expect(omnibar).toContain("isCompact ? 'rounded-[20px]' : 'rounded-[24px]'");
+      expect(omnibar).toContain('className="studio-ai-scope-button"');
+      expect(omnibar).toContain('className="studio-ai-scope-details"');
     });
   });
 

@@ -10,14 +10,21 @@ import {
 import { validateAction, assertCompleteHtml } from '@/lib/ai/actions';
 import {
   guardRequest,
-  providerSignal,
+  createProviderSignal,
+  readBoundedJson,
+  RequestBodyTooLargeError,
   validateChatRequest,
+  validateProviderHeaders,
 } from '@/lib/ai/request';
 import {
   providerKeys,
   readSSE,
-  getGeminiModelCandidateChain,
+  getNormalGeminiModelCandidateChain,
   cleanHeaderValue,
+  isGeminiModelUnavailable,
+  isGeminiThinkingSettingUnsupported,
+  ProviderResponseError,
+  readProviderErrorText,
 } from '@/lib/ai/provider';
 export const runtime = 'nodejs';
 
@@ -26,12 +33,14 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
   let body: AISpatialChatRequest;
   try {
-    body = await req.json();
-    validateChatRequest(body);
+    const parsed = await readBoundedJson(req);
+    validateChatRequest(parsed);
+    validateProviderHeaders(req, parsed.provider || 'gemini');
+    body = parsed;
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : 'Invalid request.' },
-      { status: 400 }
+      { status: error instanceof RequestBodyTooLargeError ? 413 : 400 }
     );
   }
   const provider = body.provider || 'gemini';
@@ -39,7 +48,7 @@ export async function POST(req: NextRequest) {
   if (!keys.length)
     return Response.json(
       {
-        error: `${provider === 'gemini' ? 'Gemini' : 'OpenRouter'} API Key is required. Configure a server key or add a session key in settings.`,
+        error: `${provider === 'gemini' ? 'Gemini' : provider === 'openai' ? 'OpenAI' : 'OpenRouter'} API Key is required. Add a key in settings.`,
       },
       { status: 401 }
     );
@@ -47,15 +56,19 @@ export async function POST(req: NextRequest) {
     cleanHeaderValue(body.model) ||
     (provider === 'gemini'
       ? process.env.GEMINI_MODEL || 'gemini-3.8-flash'
-      : process.env.OPENROUTER_MODEL || 'openai/gpt-4o');
+      : provider === 'openai'
+        ? process.env.OPENAI_MODEL || 'gpt-4o'
+        : process.env.OPENROUTER_MODEL || 'openai/gpt-4o');
 
   const modelCandidates =
     provider === 'gemini'
-      ? getGeminiModelCandidateChain(requestedModel)
+      ? getNormalGeminiModelCandidateChain(requestedModel)
       : [requestedModel];
   const model = modelCandidates[0];
+  let usedModel = model;
   const allow = body.interactionMode !== 'chat_only';
-  const signal = providerSignal(req);
+  const providerRequest = createProviderSignal(req);
+  const signal = providerRequest.signal;
   const system = `${SYSTEM_PROMPT}\n\n${buildSpatialContextText(body)}`;
   const history = body.messages.filter((m) => m.content.trim());
   const temperature =
@@ -63,7 +76,7 @@ export async function POST(req: NextRequest) {
       ? Math.max(0, Math.min(1, body.temperature))
       : 0.35;
   let payload: any;
-  if (provider === 'openrouter') {
+  if (provider === 'openrouter' || provider === 'openai') {
     payload = {
       model,
       messages: [
@@ -139,17 +152,26 @@ export async function POST(req: NextRequest) {
   let lastStatus = 502;
   try {
     modelLoop: for (const currentModel of modelCandidates) {
+      let advanceModel = false;
       for (let i = 0; i < keys.length; i++) {
         signal.throwIfAborted();
         const url =
           provider === 'openrouter'
             ? 'https://openrouter.ai/api/v1/chat/completions'
-            : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(keys[i])}`;
+            : provider === 'openai'
+              ? 'https://api.openai.com/v1/chat/completions'
+              : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:streamGenerateContent?alt=sse`;
         const headers: Record<string, string> =
-          provider === 'openrouter'
+          provider === 'openrouter' || provider === 'openai'
             ? {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${keys[i]}`,
+                ...(provider === 'openrouter'
+                  ? {
+                      'HTTP-Referer': 'https://visionos.local',
+                      'X-Title': 'visionOS Spatial Intelligence',
+                    }
+                  : {}),
               }
             : { 'Content-Type': 'application/json', 'x-goog-api-key': keys[i] };
         let res = await fetch(url, {
@@ -158,14 +180,15 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify(payload),
           signal,
         });
+        let errText = '';
         // Some models reject thinking settings or parameters; retry with clean options
         if (
+          !res.ok &&
           provider === 'gemini' &&
-          res.status === 400 &&
           payload.generationConfig?.thinkingConfig
         ) {
-          const error = await res.clone().text();
-          if (/thinking|includeThoughts/i.test(error)) {
+          errText = await readProviderErrorText(res.clone());
+          if (isGeminiThinkingSettingUnsupported(res.status, errText)) {
             const cleanPayload = {
               ...payload,
               generationConfig: { ...payload.generationConfig },
@@ -177,34 +200,34 @@ export async function POST(req: NextRequest) {
               body: JSON.stringify(cleanPayload),
               signal,
             });
+            errText = res.ok ? '' : await readProviderErrorText(res.clone());
           }
         }
         if (res.ok && res.body) {
           upstream = res;
           usedKeyIndex = i;
+          usedModel = currentModel;
           break modelLoop;
         }
         lastStatus = res.status;
-        const errText = await res.clone().text();
+        if (!errText) errText = await readProviderErrorText(res.clone());
         await res.body?.cancel();
 
-        // If model not found or not supported or rejected parameters, try next model candidate in chain
-        if (
-          provider === 'gemini' &&
-          (res.status === 404 ||
-            res.status === 400 ||
-            /not found|not supported|invalid argument/i.test(errText))
-        ) {
+        if (provider === 'gemini' && isGeminiModelUnavailable(res.status, errText)) {
           console.warn(
-            `[VisionOS] Model ${currentModel} not available (HTTP ${res.status}), trying fallback...`
+            `[VisionOS] Model ${currentModel} is unavailable (HTTP ${res.status}); trying an approved same-family fallback.`
           );
-          break; // break key loop to advance to next candidate model
+          advanceModel = true;
+          break;
         }
 
-        if (![401, 403, 429, 500, 502, 503, 504].includes(res.status)) break;
+        if ([401, 403, 429, 500, 502, 503, 504].includes(res.status)) continue;
+        break modelLoop;
       }
+      if (!upstream && !advanceModel) break modelLoop;
     }
   } catch (error) {
+    providerRequest.dispose();
     console.error(
       '[VisionOS] Provider connection failed',
       error instanceof Error ? error.name : 'unknown'
@@ -218,7 +241,8 @@ export async function POST(req: NextRequest) {
       { status: signal.aborted ? 504 : 502 }
     );
   }
-  if (!upstream?.body)
+  if (!upstream?.body) {
+    providerRequest.dispose();
     return Response.json(
       {
         error:
@@ -228,6 +252,7 @@ export async function POST(req: NextRequest) {
       },
       { status: lastStatus >= 400 && lastStatus < 600 ? lastStatus : 502 }
     );
+  }
   const encoder = new TextEncoder();
   const input = upstream.body;
   const controller = new AbortController();
@@ -238,7 +263,9 @@ export async function POST(req: NextRequest) {
           output.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
       };
       const calls = new Map<number, { name: string; args: string }>();
+      const actions: unknown[] = [];
       let publicText = '';
+      let providerFinished = false;
       const emitTool = (name: string, args: unknown) => {
         if (!allow)
           throw new Error(
@@ -250,10 +277,11 @@ export async function POST(req: NextRequest) {
         validateAction(frame);
         if (frame.op === 'spawn_artifact' || frame.op === 'mutate_artifact')
           assertCompleteHtml(frame.code);
-        emit({ t: 'action', frame });
+        // Stage mutations until the provider confirms a complete response.
+        actions.push(frame);
       };
       try {
-        for await (const event of readSSE(input)) {
+        for await (const event of readSSE(input, 16_000_000, signal)) {
           if (controller.signal.aborted) break;
           if (event.error)
             throw new Error(
@@ -265,13 +293,13 @@ export async function POST(req: NextRequest) {
                 'The provider could not fulfill this request. Try rephrasing it.'
               );
             const candidate = event.candidates?.[0];
-            if (
-              candidate?.finishReason &&
-              !['STOP', 'MAX_TOKENS', 'TOOL_CALLS'].includes(candidate.finishReason)
-            )
-              throw new Error(
-                'The response was incomplete or blocked. Try a smaller request.'
-              );
+            if (candidate?.finishReason) {
+              if (!['STOP', 'TOOL_CALLS'].includes(candidate.finishReason))
+                throw new Error(
+                  'The response was incomplete or blocked. Try a smaller request.'
+                );
+              providerFinished = true;
+            }
             for (const part of candidate?.content?.parts || []) {
               if (part.thought || (part as any).thoughtContent) {
                 const thoughtText = part.text || (part as any).thought || '';
@@ -300,10 +328,13 @@ export async function POST(req: NextRequest) {
             }
           } else {
             const choice = event.choices?.[0];
-            if (['length', 'content_filter'].includes(choice?.finish_reason))
-              throw new Error(
-                'The response was incomplete or blocked. Try a smaller request.'
-              );
+            if (choice?.finish_reason) {
+              if (!['stop', 'tool_calls'].includes(choice.finish_reason))
+                throw new Error(
+                  'The response was incomplete or blocked. Try a smaller request.'
+                );
+              providerFinished = true;
+            }
             const delta = choice?.delta;
             const reasoning =
               (delta as any)?.reasoning_content || (delta as any)?.thought;
@@ -330,23 +361,37 @@ export async function POST(req: NextRequest) {
           if (publicText.length > 120000)
             throw new Error('Response too long. Please narrow the request.');
         }
+        if (controller.signal.aborted) return;
+        if (!providerFinished)
+          throw new Error(
+            signal.aborted
+              ? 'Generation timed out or was cancelled.'
+              : 'The connection ended before the provider completed its response. Retry.'
+          );
         for (const entry of calls.values())
           emitTool(entry.name, JSON.parse(entry.args));
+        for (const frame of actions) emit({ t: 'action', frame });
         emit({ t: 'done' });
       } catch (error) {
         emit({
           t: 'error',
           message:
-            error instanceof Error
+            error instanceof ProviderResponseError
               ? error.message
-              : 'The response could not be parsed. Please retry.',
+              : error instanceof SyntaxError
+                ? 'The provider returned invalid structured data. Please retry.'
+                : error instanceof Error
+                  ? error.message
+                  : 'The response could not be parsed. Please retry.',
         });
       } finally {
+        providerRequest.dispose();
         if (!controller.signal.aborted) output.close();
       }
     },
     cancel() {
       controller.abort();
+      providerRequest.abort(new Error('Client cancelled response.'));
       void input.cancel().catch(() => {});
     },
   });
@@ -355,7 +400,8 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'application/x-ndjson; charset=utf-8',
       'Cache-Control': 'no-store',
       'X-Selected-Provider': provider,
-      'X-Selected-Model': model,
+      'X-Requested-Model': model,
+      'X-Selected-Model': usedModel,
       'X-Key-Index': String(usedKeyIndex),
     },
   });

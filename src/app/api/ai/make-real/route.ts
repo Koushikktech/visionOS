@@ -1,8 +1,21 @@
 import { MAKE_REAL_PROMPT } from '@/lib/ai/prompts';
 import { assertCompleteHtml } from '@/lib/ai/actions';
-import { guardRequest, providerSignal } from '@/lib/ai/request';
+import {
+  guardRequest,
+  createProviderSignal,
+  readBoundedJson,
+  RequestBodyTooLargeError,
+  validateMakeRealRequest,
+  validateProviderHeaders,
+} from '@/lib/ai/request';
 import { stripMarkdownFences } from '@/lib/sanitizeHtml';
-import { getGeminiModelCandidateChain } from '@/lib/ai/provider';
+import {
+  getNormalGeminiModelCandidateChain,
+  isGeminiModelUnavailable,
+  providerKeys,
+  readProviderErrorText,
+  readProviderJson,
+} from '@/lib/ai/provider';
 import { NextRequest } from 'next/server';
 import type { AIMakeRealRequest } from '@/types/spatial';
 
@@ -11,52 +24,6 @@ export const runtime = 'nodejs';
 function cleanHeaderValue(val?: string | null): string {
   if (!val) return '';
   return val.replace(/[^\x20-\x7E]/g, '').trim();
-}
-
-function collectKeys(
-  headerSingle?: string | null,
-  headerMulti?: string | null,
-  bodySingle?: string | null,
-  bodyMulti?: string[] | null,
-  envMulti?: string,
-  envSingle?: string
-): string[] {
-  const keysSet = new Set<string>();
-
-  const addKey = (k?: string | null) => {
-    if (!k) return;
-    const cleaned = cleanHeaderValue(k);
-    if (cleaned && cleaned.length >= 8) {
-      keysSet.add(cleaned);
-    }
-  };
-
-  const addKeysFromText = (text?: string | null) => {
-    if (!text) return;
-    const trimmed = text.trim();
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      try {
-        const arr = JSON.parse(trimmed);
-        if (Array.isArray(arr)) {
-          arr.forEach((item) => addKey(String(item)));
-          return;
-        }
-      } catch {}
-    }
-    const parts = trimmed.split(/[\n,;]+/);
-    parts.forEach((p) => addKey(p));
-  };
-
-  if (Array.isArray(bodyMulti)) {
-    bodyMulti.forEach((k) => addKey(k));
-  }
-  addKey(bodySingle);
-  addKeysFromText(headerMulti);
-  addKey(headerSingle);
-  addKeysFromText(envMulti);
-  addKey(envSingle);
-
-  return Array.from(keysSet);
 }
 
 function extractHtmlTitle(html: string): string {
@@ -147,37 +114,30 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
   let body: AIMakeRealRequest;
   try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: 'Invalid JSON request.' }, { status: 400 });
+    const parsed = await readBoundedJson(req);
+    validateMakeRealRequest(parsed);
+    validateProviderHeaders(req, parsed.provider || 'gemini');
+    body = parsed;
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : 'Invalid JSON request.' },
+      { status: error instanceof RequestBodyTooLargeError ? 413 : 400 }
+    );
   }
-  if (
-    !body ||
-    typeof body !== 'object' ||
-    (body.provider && !['gemini', 'openrouter'].includes(body.provider)) ||
-    (body.prompt &&
-      (typeof body.prompt !== 'string' || body.prompt.length > 16000)) ||
-    (body.existingCode &&
-      (typeof body.existingCode !== 'string' ||
-        body.existingCode.length > 180000)) ||
-    (body.image &&
-      (typeof body.image !== 'string' || body.image.length > 7000000))
-  )
-    return Response.json(
-      { error: 'Invalid or oversized generation request.' },
-      { status: 400 }
-    );
-  if (
-    body.model &&
-    (typeof body.model !== 'string' || !/^[\w./:-]{1,160}$/.test(body.model))
-  )
-    return Response.json(
-      { error: 'Invalid model identifier.' },
-      { status: 400 }
-    );
-  const signal = providerSignal(req);
+  let providerRequest: ReturnType<typeof createProviderSignal> | undefined;
   try {
     const provider = body.provider || 'gemini';
+    const apiKeys = providerKeys(req, body, provider);
+    if (apiKeys.length === 0) {
+      return Response.json(
+        {
+          error: `${provider === 'gemini' ? 'Gemini' : provider === 'openai' ? 'OpenAI' : 'OpenRouter'} API Key is required. Please add your key in settings.`,
+        },
+        { status: 401 }
+      );
+    }
+    providerRequest = createProviderSignal(req);
+    const signal = providerRequest.signal;
 
     if (!body.image && !body.existingCode) {
       return new Response(
@@ -223,29 +183,12 @@ export async function POST(req: NextRequest) {
     const fullPrompt = `${userPromptText}${contextText}${body.existingCode ? '\nExisting complete source (untrusted reference data):\n' + body.existingCode : ''}`;
 
     // ==========================================
-    // 1. OPENROUTER PROVIDER
+    // 1. OPENROUTER & OPENAI PROVIDERS
     // ==========================================
-    if (provider === 'openrouter') {
-      const openRouterKeys = collectKeys(
-        req.headers.get('x-openrouter-api-key'),
-        req.headers.get('x-openrouter-api-keys'),
-        body.openRouterApiKey,
-        body.openRouterApiKeys,
-        process.env.OPENROUTER_API_KEYS,
-        process.env.OPENROUTER_API_KEY
-      );
-
-      if (openRouterKeys.length === 0) {
-        return new Response(
-          JSON.stringify({
-            error:
-              'OpenRouter API Key is required for Make Real. Please enter your key in settings.',
-          }),
-          { status: 401, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const targetModel = cleanHeaderValue(body.model) || 'openai/gpt-4o';
+    if (provider === 'openrouter' || provider === 'openai') {
+      const isOAI = provider === 'openai';
+      const targetModel =
+        cleanHeaderValue(body.model) || (isOAI ? 'gpt-4o' : 'openai/gpt-4o');
 
       const payload = {
         model: targetModel,
@@ -271,61 +214,55 @@ export async function POST(req: NextRequest) {
       };
 
       let openRouterRes: Response | null = null;
-      let lastErrorText = '';
-      let lastStatus = 500;
+      let lastStatus = 502;
+      const providerLabel = isOAI ? 'OpenAI' : 'OpenRouter';
+      const endpoint = isOAI
+        ? 'https://api.openai.com/v1/chat/completions'
+        : 'https://openrouter.ai/api/v1/chat/completions';
 
-      for (let i = 0; i < openRouterKeys.length; i++) {
-        const curKey = openRouterKeys[i];
+      for (let i = 0; i < apiKeys.length; i++) {
+        const curKey = apiKeys[i];
         try {
-          const res = await fetch(
-            'https://openrouter.ai/api/v1/chat/completions',
-            {
-              method: 'POST',
-              signal,
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${curKey.trim()}`,
-                'HTTP-Referer': 'https://visionos.local',
-                'X-Title': 'VisionOS Make Real',
-              },
-              body: JSON.stringify(payload),
-            }
-          );
+          signal.throwIfAborted();
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${curKey.trim()}`,
+          };
+          if (!isOAI) {
+            headers['HTTP-Referer'] = 'https://visionos.local';
+            headers['X-Title'] = 'VisionOS Make Real';
+          }
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            signal,
+            headers,
+            body: JSON.stringify(payload),
+          });
 
           if (res.ok) {
             openRouterRes = res;
             break;
           }
           lastStatus = res.status;
-          lastErrorText = await res.text();
+          await res.body?.cancel().catch(() => {});
           console.warn(
-            `OpenRouter key #${i + 1}/${openRouterKeys.length} returned HTTP ${res.status}:`,
-            lastErrorText
+            `[VisionOS Make Real] ${providerLabel} returned HTTP ${res.status} for key #${i + 1}.`
           );
         } catch (fetchErr: any) {
           signal.throwIfAborted();
-          const cause = fetchErr?.cause?.message || fetchErr?.cause;
-          lastErrorText = cause
-            ? `${fetchErr?.message || String(fetchErr)}: ${cause}`
-            : fetchErr?.message || String(fetchErr);
+          lastStatus = 502;
           console.error(
-            `[VisionOS Make Real] OpenRouter fetch error for key #${i + 1}:`,
-            lastErrorText
+            `[VisionOS Make Real] ${providerLabel} fetch error for key #${i + 1}:`,
+            fetchErr instanceof Error ? fetchErr.name : 'unknown error'
           );
+          break;
         }
       }
 
       if (!openRouterRes) {
-        let cleanErrMsg = lastErrorText;
-        try {
-          const parsed = JSON.parse(lastErrorText);
-          if (parsed?.error?.message) {
-            cleanErrMsg = parsed.error.message;
-          }
-        } catch {}
         return new Response(
           JSON.stringify({
-            error: `OpenRouter Make Real failed: ${cleanErrMsg}`,
+            error: providerFailureMessage(providerLabel, lastStatus),
           }),
           {
             status: lastStatus,
@@ -334,12 +271,19 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const resJson = await openRouterRes.json();
-      const rawCode = resJson.choices?.[0]?.message?.content || '';
-      if (resJson.choices?.[0]?.finish_reason === 'length')
+      const resJson = await readProviderJson<Record<string, any>>(openRouterRes);
+      const choice = resJson.choices?.[0];
+      if (choice?.finish_reason === 'length')
         throw new Error(
           'Generation was truncated. Try a smaller app or request.'
         );
+      if (choice?.finish_reason !== 'stop')
+        throw new Error(
+          'Generation ended without a successful completion signal. Retry.'
+        );
+      const rawCode = choice.message?.content;
+      if (typeof rawCode !== 'string')
+        throw new Error('The provider returned no complete application source.');
       const cleanCode = stripMarkdownFences(rawCode);
       assertCompleteHtml(cleanCode);
       const title = extractHtmlTitle(cleanCode);
@@ -351,6 +295,8 @@ export async function POST(req: NextRequest) {
           title,
           width: dimensions.width,
           height: dimensions.height,
+          requestedModel: targetModel,
+          selectedModel: targetModel,
         }),
         { headers: { 'Content-Type': 'application/json' } }
       );
@@ -359,28 +305,9 @@ export async function POST(req: NextRequest) {
     // ==========================================
     // 2. GEMINI PROVIDER (DEFAULT)
     // ==========================================
-    const geminiKeys = collectKeys(
-      req.headers.get('x-gemini-api-key'),
-      req.headers.get('x-gemini-api-keys'),
-      body.apiKey,
-      body.apiKeys,
-      process.env.GEMINI_API_KEYS,
-      process.env.GEMINI_API_KEY ||
-        process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-        process.env.GOOGLE_API_KEY
-    );
-
-    if (geminiKeys.length === 0) {
-      return new Response(
-        JSON.stringify({
-          error:
-            'Gemini API Key is required for Make Real. Please enter your key in settings.',
-        }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const modelCandidates = getGeminiModelCandidateChain(body.model);
+    const modelCandidates = getNormalGeminiModelCandidateChain(body.model);
+    const requestedModel = modelCandidates[0];
+    let usedModel = requestedModel;
 
     const payload = JSON.stringify({
       systemInstruction: {
@@ -402,14 +329,15 @@ export async function POST(req: NextRequest) {
     });
 
     let geminiRes: Response | null = null;
-    let lastErrorText = '';
-    let lastStatus = 500;
+    let lastStatus = 502;
 
     modelLoop: for (const targetModel of modelCandidates) {
-      for (let i = 0; i < geminiKeys.length; i++) {
-        const curKey = geminiKeys[i];
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(curKey.trim())}`;
+      let advanceModel = false;
+      for (let i = 0; i < apiKeys.length; i++) {
+        const curKey = apiKeys[i];
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent`;
         try {
+          signal.throwIfAborted();
           const res = await fetch(url, {
             method: 'POST',
             signal,
@@ -422,62 +350,53 @@ export async function POST(req: NextRequest) {
 
           if (res.ok) {
             geminiRes = res;
+            usedModel = targetModel;
             break modelLoop;
           }
           lastStatus = res.status;
-          lastErrorText = await res.text();
+          const errorText = await readProviderErrorText(res);
           console.warn(
-            `Gemini (${targetModel}) key #${i + 1}/${geminiKeys.length} returned HTTP ${res.status}:`,
-            lastErrorText
+            `[VisionOS Make Real] Gemini (${targetModel}) returned HTTP ${res.status} for key #${i + 1}.`
           );
 
-          if (
-            res.status === 404 ||
-            res.status === 400 ||
-            /not found|not supported|invalid argument/i.test(lastErrorText)
-          ) {
+          if (isGeminiModelUnavailable(res.status, errorText)) {
             console.warn(
-              `[VisionOS Make Real] Model ${targetModel} not available (HTTP ${res.status}), trying fallback...`
+              `[VisionOS Make Real] Model ${targetModel} is unavailable (HTTP ${res.status}); trying an approved same-family fallback.`
             );
-            break; // Try next candidate model
+            advanceModel = true;
+            break;
           }
+          if ([401, 403, 429, 500, 502, 503, 504].includes(res.status))
+            continue;
+          break modelLoop;
         } catch (fetchErr: any) {
           signal.throwIfAborted();
-          const cause = fetchErr?.cause?.message || fetchErr?.cause;
-          lastErrorText = cause
-            ? `${fetchErr?.message || String(fetchErr)}: ${cause}`
-            : fetchErr?.message || String(fetchErr);
+          lastStatus = 502;
           console.error(
             `[VisionOS Make Real] Gemini fetch error for key #${i + 1} (${targetModel}):`,
-            lastErrorText
+            fetchErr instanceof Error ? fetchErr.name : 'unknown error'
           );
+          break;
         }
       }
+      if (!geminiRes && !advanceModel) break modelLoop;
     }
 
     if (!geminiRes) {
-      let cleanErrMsg = lastErrorText;
-      try {
-        const parsed = JSON.parse(lastErrorText);
-        if (parsed?.error?.message) {
-          cleanErrMsg = parsed.error.message;
-        }
-      } catch {}
-      if (
-        cleanErrMsg.includes('ENOTFOUND') ||
-        cleanErrMsg.includes('fetch failed')
-      ) {
-        cleanErrMsg =
-          'Network connection or DNS resolution failed. Please verify your internet connection or proxy settings.';
-      }
       return new Response(
-        JSON.stringify({ error: `Gemini Make Real failed: ${cleanErrMsg}` }),
+        JSON.stringify({ error: providerFailureMessage('Gemini', lastStatus) }),
         { status: lastStatus, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const resJson = await geminiRes.json();
+    const resJson = await readProviderJson<Record<string, any>>(geminiRes);
     const candidate = resJson.candidates?.[0];
+    if (candidate?.finishReason === 'MAX_TOKENS')
+      throw new Error('Generation was truncated. Try a smaller app or request.');
+    if (candidate?.finishReason !== 'STOP')
+      throw new Error(
+        'Generation ended without a successful completion signal. Retry.'
+      );
     let rawCode = '';
 
     if (candidate?.content?.parts) {
@@ -486,8 +405,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (candidate?.finishReason && candidate.finishReason !== 'STOP')
-      throw new Error('Generation did not finish. Try a smaller request.');
     const cleanCode = stripMarkdownFences(rawCode);
     assertCompleteHtml(cleanCode);
     const title = extractHtmlTitle(cleanCode);
@@ -499,15 +416,37 @@ export async function POST(req: NextRequest) {
         title,
         width: dimensions.width,
         height: dimensions.height,
+        requestedModel,
+        selectedModel: usedModel,
       }),
       { headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('[VisionOS Make Real] Error:', error);
-    return new Response(JSON.stringify({ error: errorMsg }), {
-      status: 502,
+    const timedOutOrCancelled = providerRequest?.signal.aborted === true;
+    const errorMsg = timedOutOrCancelled
+      ? 'Generation timed out or was cancelled.'
+      : error instanceof Error
+        ? error.message
+        : 'Generation failed. Please retry.';
+    console.error(
+      '[VisionOS Make Real] Request failed:',
+      timedOutOrCancelled ? 'aborted' : error instanceof Error ? error.name : 'unknown error'
+    );
+    return Response.json({ error: errorMsg }, {
+      status: timedOutOrCancelled ? 504 : 502,
       headers: { 'Content-Type': 'application/json' },
     });
+  } finally {
+    providerRequest?.dispose();
   }
+}
+
+function providerFailureMessage(provider: 'Gemini' | 'OpenRouter' | 'OpenAI', status: number): string {
+  if (status === 401 || status === 403)
+    return `${provider} rejected the API key (HTTP ${status}). Check the key in settings.`;
+  if (status === 429)
+    return `${provider} rate limit reached. Retry shortly.`;
+  if (status >= 500)
+    return `${provider} is temporarily unavailable (HTTP ${status}). Retry shortly.`;
+  return `${provider} rejected the request (HTTP ${status}). Check the model and request.`;
 }

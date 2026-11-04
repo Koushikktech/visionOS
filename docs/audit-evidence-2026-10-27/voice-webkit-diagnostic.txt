@@ -1,0 +1,31 @@
+RUN WebKit
+BODY visionOS
+SPATIAL
+Page 1
+0
+Recovery copy saved on this device
+100%
+Spatial Intelligence
+
+gemini-3.8-flash
+
+Spatial Intelligence
+
+Select elements to edit them together, or describe what you would like to build or design in visionOS.
+
+Ready
+Thinking
+Swarm
+SOON
+DEBUG {
+  mediaType: 'function',
+  audioContext: 'AudioContextFixture',
+  resolveType: 'function',
+  recognitions: [ { start: 'function', result: 'function' } ],
+  microphones: [],
+  held: 'undefined'
+}
+Error: Voice fixture timed out
+    at poll (/private/tmp/visionos-voice-webkit-debug.cjs:2:146)
+    at async run (/private/tmp/visionos-voice-webkit-debug.cjs:3:2334)
+    at async /private/tmp/visionos-voice-webkit-debug.cjs:5:86

@@ -1,0 +1,28 @@
+backup asset {
+  embeddedAssetCount: 1,
+  excludedAssets: [],
+  exclusions: [
+    'AI chat history, provider keys, and application preferences are not included. App virtual storage is included in the workspace snapshot.'
+  ]
+} data:image/png;base64,iVBORw0KGgoAAAANSU
+{
+  "engine": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+  "sourceImage": {
+    "complete": true,
+    "width": 1,
+    "height": 1
+  },
+  "backupPortability": {
+    "embeddedAssetCount": 1,
+    "excludedAssets": [],
+    "exclusions": [
+      "AI chat history, provider keys, and application preferences are not included. App virtual storage is included in the workspace snapshot."
+    ]
+  },
+  "restoredImage": {
+    "complete": true,
+    "width": 1,
+    "height": 1
+  },
+  "errors": []
+}

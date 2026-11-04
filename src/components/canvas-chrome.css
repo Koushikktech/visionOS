@@ -1,0 +1,427 @@
+/* Floating controls use glass; windows and authored canvas content stay opaque. */
+.studio-canvas-chrome {
+  color: var(--studio-primary, var(--studio-text, #20242b));
+  -webkit-font-smoothing: antialiased;
+}
+
+.studio-canvas-chrome.liquid-glass-dock,
+.studio-canvas-chrome.liquid-glass-pill,
+.studio-canvas-chrome.liquid-glass-popover,
+.studio-canvas-chrome .liquid-glass-dock,
+.studio-canvas-chrome .liquid-glass-pill,
+.studio-canvas-chrome .liquid-glass-popover {
+  color: var(--studio-primary, var(--studio-text, #20242b));
+  background: var(--glass-surface, var(--studio-floating, rgb(255 255 255 / 76%)));
+  border-color: var(--glass-highlight, var(--studio-boundary, rgb(30 38 52 / 14%)));
+  -webkit-backdrop-filter: blur(28px) saturate(138%);
+  backdrop-filter: blur(28px) saturate(138%);
+  box-shadow: var(--glass-shadow, 0 16px 42px rgb(20 28 42 / 16%));
+}
+
+.studio-canvas-chrome [class~="text-white"],
+.studio-canvas-chrome [class~="text-white/95"],
+.studio-canvas-chrome [class~="text-white/90"],
+.studio-canvas-chrome [class~="text-white/80"],
+.studio-canvas-chrome [class~="text-white/75"],
+.studio-canvas-chrome [class~="text-white/70"],
+.studio-canvas-chrome [class~="text-white/60"],
+.studio-canvas-chrome [class~="text-white/50"],
+.studio-canvas-chrome [class~="text-slate-100"],
+.studio-canvas-chrome [class~="text-slate-200"] {
+  color: var(--studio-primary, var(--studio-text, #20242b));
+}
+
+.studio-canvas-chrome [class~="text-slate-300"],
+.studio-canvas-chrome [class~="text-slate-400"],
+.studio-canvas-chrome [class~="text-slate-500"] {
+  color: var(--studio-secondary, #5e6672);
+}
+
+.studio-canvas-chrome :is([class~="text-amber-50"], [class~="text-amber-100"], [class~="text-amber-200"]) {
+  color: var(--studio-caution, #805900);
+}
+
+.studio-canvas-chrome [class~="bg-white/5"],
+.studio-canvas-chrome [class~="bg-white/10"],
+.studio-canvas-chrome [class~="bg-white/15"],
+.studio-canvas-chrome [class~="bg-white/20"] {
+  background-color: var(--studio-control-hover, rgb(35 48 68 / 8%));
+}
+
+.studio-canvas-chrome [class~="bg-white/[0.025]"],
+.studio-canvas-chrome [class~="bg-white/[0.035]"],
+.studio-canvas-chrome [class~="bg-white/[0.04]"],
+.studio-canvas-chrome [class~="bg-white/[0.06]"] {
+  background-color: color-mix(in srgb, var(--studio-control-hover, #687384) 34%, transparent);
+}
+
+.studio-canvas-chrome [class~="border-white/5"],
+.studio-canvas-chrome [class~="border-white/10"],
+.studio-canvas-chrome [class~="border-white/15"],
+.studio-canvas-chrome [class~="border-white/20"] {
+  border-color: var(--studio-boundary, rgb(35 48 68 / 14%));
+}
+
+.studio-canvas-chrome :is(button, a, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--studio-action, var(--studio-accent, #315fbd));
+  outline-offset: 2px;
+}
+
+.studio-canvas-chrome :is(button, a) {
+  transition-property: color, background-color, border-color, opacity, transform;
+  transition-duration: 140ms;
+  transition-timing-function: cubic-bezier(.2, 0, 0, 1);
+}
+
+.studio-canvas-chrome [aria-pressed="true"] {
+  color: var(--studio-accent, #315fbd);
+}
+
+.studio-canvas-chrome [data-tool][aria-pressed="true"] > div {
+  background: var(--accent-soft, var(--studio-control-hover, rgb(49 95 189 / 10%)));
+  border-color: var(--glass-highlight, var(--studio-boundary, rgb(35 48 68 / 16%)));
+}
+
+.studio-chrome-primary-action {
+  color: var(--studio-action-contrast, var(--studio-button-text, #fff));
+  background: var(--studio-action-strong, var(--studio-button, #315fbd));
+  border: 1px solid var(--studio-action, var(--studio-accent, #315fbd));
+}
+
+.studio-chrome-primary-action:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+/* Native canvas windows use a standard, readable surface. The titlebar is the
+   small functional layer; rendered app, note, code and slide content is left alone. */
+.studio-native-window {
+  container: native-window / inline-size;
+  color: var(--studio-text, #20242b);
+  background: var(--studio-surface, #fff);
+  border: 1px solid var(--studio-border, rgb(35 48 68 / 16%));
+  box-shadow: var(--window-shadow, 0 12px 34px rgb(20 28 42 / 12%));
+}
+
+.studio-native-window:hover {
+  border-color: color-mix(in srgb, var(--studio-border, #8792a3) 65%, var(--studio-accent, #315fbd) 35%);
+}
+
+.studio-native-window > [data-window-header] {
+  box-sizing: border-box;
+  min-height: 52px;
+  height: auto;
+  gap: 8px;
+  color: var(--studio-text, #20242b);
+  background: var(--glass-surface, var(--studio-floating, rgb(255 255 255 / 76%)));
+  border-bottom: 1px solid var(--studio-border, rgb(35 48 68 / 16%));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--glass-highlight, #fff) 45%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.studio-native-window > [data-window-header] :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300) {
+  color: var(--studio-text, #20242b);
+}
+
+.studio-native-window > [data-window-header] :is(.text-slate-400, .text-slate-500) {
+  color: var(--studio-secondary, #5e6672);
+}
+
+.studio-native-window [data-window-toolbar] {
+  color: var(--studio-text, #20242b);
+  background: var(--studio-surface, #fff);
+  border-color: var(--studio-border, rgb(35 48 68 / 16%));
+}
+
+.studio-native-window [data-window-toolbar] :is(.text-white, .text-white\/95, .text-white\/90, .text-white\/80, .text-white\/70, .text-slate-100, .text-slate-200) {
+  color: var(--studio-text, #20242b);
+}
+
+.studio-native-window [data-window-toolbar] :is(.text-slate-300, .text-slate-400, .text-slate-500) {
+  color: var(--studio-secondary, #5e6672);
+}
+
+.studio-native-window [data-window-toolbar] :is(button, input, label) {
+  color: var(--studio-text, #20242b);
+}
+
+.studio-native-window [data-window-toolbar] :is(button, input) {
+  border-color: var(--studio-border, rgb(35 48 68 / 16%));
+}
+
+.studio-native-window [data-window-toolbar] :is(button, input):is([class~="bg-white/5"], [class~="bg-white/10"], [class~="bg-black/30"]) {
+  background: var(--studio-workspace, #f3f5f8);
+}
+
+.studio-native-window [data-window-toolbar] :is(button:hover:not(:disabled), summary:hover) {
+  background: var(--studio-control-hover, rgb(35 48 68 / 8%));
+}
+
+.studio-native-window [data-window-toolbar] :is(.text-amber-100, .text-amber-200) {
+  color: var(--studio-caution, #805900);
+}
+
+.studio-native-window [data-window-toolbar] :is(.text-indigo-200, .text-indigo-300) {
+  color: var(--studio-accent, #315fbd);
+}
+
+.studio-native-app [data-native-editor="source"] {
+  color: var(--studio-text, #20242b);
+  background: var(--studio-surface, #fff);
+}
+
+.studio-native-app [data-native-editor="source"] :is(label, p, span) {
+  color: var(--studio-secondary, #5e6672);
+}
+
+.studio-native-app [data-native-editor="source"] textarea {
+  color: var(--studio-text, #20242b);
+  background: var(--studio-workspace, #f3f5f8);
+  border-color: var(--studio-control-border, var(--studio-border, #8992a0));
+  font-size: 1rem;
+}
+
+.studio-native-app [data-native-editor="source"] button.bg-indigo-500 {
+  color: var(--studio-button-text, #fff);
+  background: var(--studio-button, #315fbd);
+}
+
+.studio-native-window > [data-window-header] button,
+.studio-native-window > [data-window-header] a {
+  border-radius: 999px;
+}
+
+.studio-native-window > [data-window-header] > :first-child {
+  min-width: 0;
+}
+
+.studio-native-window [data-window-title] {
+  color: var(--studio-text, #20242b);
+  font-size: .875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -.01em;
+}
+
+.studio-native-window > [data-window-header] :is(.bg-white\/5, .bg-white\/10) {
+  color: var(--studio-secondary, #5e6672);
+  background: var(--studio-control-hover, rgb(35 48 68 / 8%));
+  border-color: var(--studio-border, rgb(35 48 68 / 14%));
+}
+
+.studio-native-code-window > [data-scrollable="true"],
+.studio-native-app > .bg-black\/40,
+.studio-native-media-window > .bg-\[\#0b0e1c\] {
+  color-scheme: dark;
+}
+
+.studio-native-app > .bg-black\/40 {
+  color: #f2f3f5;
+}
+
+.studio-native-app > .bg-black\/40 :is(.text-slate-100, .text-slate-200, .text-slate-300, .text-slate-400) {
+  color: #d7dce6;
+}
+
+.studio-safety-surface {
+  color: var(--studio-text, #20242b);
+  background: var(--studio-surface, #fff);
+  border-color: var(--studio-border, rgb(35 48 68 / 16%));
+  box-shadow: var(--glass-shadow, 0 22px 60px rgb(20 28 42 / 20%));
+}
+
+.studio-safety-surface :is(h2, h3, dd, legend) {
+  color: var(--studio-text, #20242b);
+}
+
+.studio-safety-surface :is(p, dt, summary) {
+  color: var(--studio-secondary, #5e6672);
+}
+
+.studio-safety-surface :is(input, textarea, select) {
+  color: var(--studio-text, #20242b);
+  background: var(--studio-workspace, #f3f5f8);
+  border-color: var(--studio-control-border, var(--studio-border, #8992a0));
+  color-scheme: inherit;
+}
+
+.studio-safety-surface label[class~="text-slate-100"],
+.studio-safety-surface label[class~="text-slate-200"] {
+  color: var(--studio-text, #20242b);
+}
+
+.studio-safety-surface :is([class~="text-amber-50"], [class~="text-amber-100"], [class~="text-amber-200"]) {
+  color: var(--studio-caution, #805900);
+}
+
+.studio-safety-surface button.bg-indigo-500 {
+  color: var(--studio-button-text, #fff);
+  background: var(--studio-button, #315fbd);
+}
+
+.studio-safety-surface :is(button, summary) {
+  min-height: 44px;
+}
+
+.studio-safety-surface [role="alert"] {
+  color: var(--studio-error, #a92b32);
+}
+
+.studio-safety-surface [role="status"] {
+  color: var(--studio-secondary, #5e6672);
+}
+
+.studio-focus-surface {
+  color: var(--studio-text, #20242b);
+  background: var(--studio-surface, #fff);
+  border-color: var(--studio-border, rgb(35 48 68 / 16%));
+  box-shadow: var(--glass-shadow, 0 24px 64px rgb(20 28 42 / 20%));
+}
+
+.studio-focus-surface > header {
+  min-height: 56px;
+  color: var(--studio-text, #20242b);
+  background: var(--glass-surface, var(--studio-floating, rgb(255 255 255 / 76%)));
+  border-color: var(--studio-border, rgb(35 48 68 / 16%));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--glass-highlight, #fff) 45%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.studio-focus-surface > header :is(h2, button) {
+  color: var(--studio-text, #20242b);
+}
+
+.studio-focus-surface > header button {
+  border-radius: 999px;
+}
+
+.studio-focus-surface :is(label, h2, h3, dt, dd, summary, button) {
+  color: inherit;
+}
+
+.studio-focus-surface :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300) {
+  color: var(--studio-text, #20242b);
+}
+
+.studio-focus-surface :is(.text-slate-400, .text-slate-500) {
+  color: var(--studio-secondary, #5e6672);
+}
+
+.studio-focus-surface :is([class~="text-amber-50"], [class~="text-amber-100"], [class~="text-amber-200"]) {
+  color: var(--studio-caution, #805900);
+}
+
+.studio-focus-surface :is(.border-white\/5, .border-white\/10, .border-white\/15, .border-white\/20) {
+  border-color: var(--studio-border, rgb(35 48 68 / 16%));
+}
+
+.studio-focus-surface :is(.bg-white\/5, .bg-white\/10, .bg-white\/15) {
+  background: var(--studio-control-hover, rgb(35 48 68 / 8%));
+}
+
+.studio-focus-surface :is(.bg-black\/20, .bg-black\/25, .bg-black\/30, .bg-black\/45) {
+  background: var(--studio-workspace, #f3f5f8);
+}
+
+.studio-focus-surface > div > .bg-slate-950 {
+  background: var(--studio-surface, #fff);
+  color: var(--studio-text, #20242b);
+}
+
+.studio-focus-surface :is(input, textarea, select) {
+  min-height: 44px;
+  color: var(--studio-text, #20242b);
+  background: var(--studio-workspace, #f3f5f8);
+  border-color: var(--studio-control-border, var(--studio-border, #8992a0));
+}
+
+.studio-focus-surface textarea {
+  min-height: 8rem;
+}
+
+.studio-focus-surface :is(button, a) {
+  min-height: 44px;
+}
+
+.studio-focus-surface button.bg-indigo-500,
+.studio-focus-surface button.bg-sky-500 {
+  color: var(--studio-button-text, #fff);
+  background: var(--studio-button, #315fbd);
+}
+
+.studio-focus-backdrop {
+  background: var(--studio-scrim, rgb(15 20 30 / 44%));
+  -webkit-backdrop-filter: blur(10px) saturate(1.15);
+  backdrop-filter: blur(10px) saturate(1.15);
+}
+
+.studio-speculative-card {
+  color: var(--studio-primary, var(--studio-text, #20242b));
+  background: var(--studio-raised, var(--studio-surface, #fff));
+  border-color: var(--studio-boundary, var(--studio-border, rgb(35 48 68 / 16%)));
+  box-shadow: var(--glass-shadow, 0 16px 40px rgb(20 28 42 / 12%));
+}
+
+.studio-speculative-card .studio-skeleton-line {
+  background: color-mix(in srgb, var(--studio-secondary, #5e6672) 18%, transparent);
+}
+
+.studio-speculative-card .studio-skeleton-mark {
+  color: var(--studio-action, var(--studio-accent, #315fbd));
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .studio-canvas-chrome.liquid-glass-dock,
+  .studio-canvas-chrome.liquid-glass-pill,
+  .studio-canvas-chrome.liquid-glass-popover,
+  .studio-canvas-chrome .liquid-glass-dock,
+  .studio-canvas-chrome .liquid-glass-pill,
+  .studio-canvas-chrome .liquid-glass-popover,
+  .studio-native-window > [data-window-header],
+  .studio-focus-surface > header {
+    background: var(--studio-surface, #fff);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .studio-focus-backdrop {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .studio-canvas-chrome.liquid-glass-dock,
+  .studio-canvas-chrome.liquid-glass-pill,
+  .studio-canvas-chrome.liquid-glass-popover,
+  .studio-native-window,
+  .studio-focus-surface,
+  .studio-safety-surface {
+    border-color: var(--studio-control-border, var(--studio-border, currentColor));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-canvas-chrome :is(button, a),
+  .studio-native-window {
+    transition-duration: 0.01ms;
+  }
+}
+
+@media (max-width: 600px) {
+  .studio-native-window > [data-window-header] {
+    padding-inline: 10px;
+  }
+}
+
+/* Shared floating-control rhythm. Swatches and authored artwork keep their colors. */
+.studio-canvas-chrome :is([class~="text-indigo-300"], [class~="text-indigo-400"], [class~="text-sky-300"]) { color: var(--studio-accent); }
+.studio-canvas-chrome [class~="bg-[#12141c]"] { background: var(--studio-surface); }
+.studio-canvas-chrome :is([class~="border-indigo-500/30"], [class~="border-indigo-400/30"]) { border-color: var(--studio-control-border); }
+.studio-focus-surface > header { background: var(--glass-surface); border-color: var(--studio-border); }
+.studio-focus-surface > header button { border-radius: 50%; }
+.studio-safety-surface[role="dialog"] { background: var(--glass-surface); backdrop-filter: blur(28px) saturate(138%); -webkit-backdrop-filter: blur(28px) saturate(138%); }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .studio-safety-surface, .studio-focus-surface > header { background: var(--studio-surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}

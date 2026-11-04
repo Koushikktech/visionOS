@@ -1,0 +1,21 @@
+paused frames 0
+ASSERTED CURRENT EPOCH COMMIT4
+RELOAD STATE visionOS
+SPATIAL
+Page 1
+1
+100%
+Ask visionOS Spatial AI...
+K
+Paused Backup Fixture
+RUNNING
+2 keys
+Limited requests
+Interact
+App data saved on this device.
+
+External subresources, connections and form submissions are blocked. Navigating this frame can open a destination that makes requests.
+
+Edit content
+durable refresh passed
+clear/reload/undo passed

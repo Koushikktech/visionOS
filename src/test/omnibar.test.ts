@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'bun:test';
+import React from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   getConcentricRadius,
   getInnerConcentricRadius,
@@ -8,7 +10,12 @@ import {
   APPLE_GLASS,
   ICON_STROKE_WEIGHTS,
 } from '@/lib/tokens';
-import { SpatialAIOmnibar } from '@/components/SpatialAIOmnibar';
+import {
+  createSpatialAIPanelPortal,
+  insertDictationAtSelection,
+  resolveComposerSubmission,
+  SpatialAIOmnibar,
+} from '@/components/SpatialAIOmnibar';
 import { SpeculativeSkeletonOverlay } from '@/components/SpeculativeSkeletonOverlay';
 import { AIAgentCursor } from '@/components/AIAgentCursor';
 import { VisionOnboardingModal, GEMINI_MODEL_PRESETS } from '@/components/VisionOnboardingModal';
@@ -65,8 +72,61 @@ describe('visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.tes
   });
 
   describe('Component Exports & Module Integrity', () => {
+    it('inserts dictation at the captured selection and keeps the surrounding prompt text', () => {
+      const insertion = insertDictationAtSelection('Before after', 7, 7, 'spoken');
+
+      expect(insertion.value).toBe('Before spoken after');
+      expect(insertion.caret).toBe(13);
+    });
+
     it('exports SpatialAIOmnibar as a valid React component', () => {
       expect(typeof SpatialAIOmnibar).toBe('function');
+    });
+
+    it('keeps an unsent draft in provider setup until the user sends it explicitly', () => {
+      const draft = '  Make a small timer app  ';
+      const withoutKey = resolveComposerSubmission(draft, false, false);
+
+      expect(withoutKey).toEqual({ kind: 'provider-setup', draft });
+      expect(resolveComposerSubmission(draft, true, false)).toEqual({
+        kind: 'send',
+        prompt: 'Make a small timer app',
+      });
+      expect(resolveComposerSubmission(draft, true, true)).toEqual({ kind: 'idle' });
+      expect(resolveComposerSubmission('   ', true, false)).toEqual({ kind: 'idle' });
+    });
+
+    it('keeps the AI panel as a valid AnimatePresence child inside its portal', () => {
+      const target = { nodeType: 1 } as Element;
+      const panel = React.createElement(motion.aside, {
+        exit: { opacity: 0 },
+      } as any);
+      const openPortal = createSpatialAIPanelPortal(true, panel, target);
+
+      expect(openPortal).not.toBeNull();
+      const presence = openPortal!.children as React.ReactElement<{
+        children?: React.ReactNode;
+      }>;
+      expect(React.isValidElement(presence)).toBe(true);
+      expect(presence.type).toBe(AnimatePresence);
+      expect(React.isValidElement(presence.props.children)).toBe(true);
+      const renderedPanel = presence.props.children as React.ReactElement<{
+        exit?: { opacity: number };
+      }>;
+      expect(renderedPanel.type).toBe(motion.aside);
+      expect(renderedPanel.props.exit).toEqual({ opacity: 0 });
+
+      const source = require('fs').readFileSync(
+        require('path').join(process.cwd(), 'src/components/SpatialAIOmnibar.tsx'),
+        'utf8'
+      );
+      expect(source).toContain('createSpatialAIPanelPortal(\n        active && isOpen,');
+
+      const closedPortal = createSpatialAIPanelPortal(false, panel, target);
+      const closedPresence = closedPortal!.children as React.ReactElement<{
+        children?: React.ReactNode;
+      }>;
+      expect(closedPresence.props.children).toBeNull();
     });
 
     it('exports SpeculativeSkeletonOverlay as a valid React component', () => {

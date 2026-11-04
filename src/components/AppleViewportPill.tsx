@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Editor } from '@tldraw/tldraw';
+import { useReducedMotion } from 'framer-motion';
 import { Minus, Plus, Maximize2, Undo2, Redo2 } from 'lucide-react';
 
 /**
@@ -18,6 +19,7 @@ export interface AppleViewportPillProps {
 }
 
 export const AppleViewportPill: React.FC<AppleViewportPillProps> = ({ editor }) => {
+  const reduceMotion = useReducedMotion() ?? false;
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -48,38 +50,38 @@ export const AppleViewportPill: React.FC<AppleViewportPillProps> = ({ editor }) 
   const handleZoomOut = useCallback(() => {
     if (!editor) return;
     try {
-      editor.zoomOut();
+      editor.zoomOut(undefined, { animation: { duration: reduceMotion ? 0 : 200 } });
     } catch (err) {
       // Fallback
     }
-  }, [editor]);
+  }, [editor, reduceMotion]);
 
   const handleZoomIn = useCallback(() => {
     if (!editor) return;
     try {
-      editor.zoomIn();
+      editor.zoomIn(undefined, { animation: { duration: reduceMotion ? 0 : 200 } });
     } catch (err) {
       // Fallback
     }
-  }, [editor]);
+  }, [editor, reduceMotion]);
 
   const handleZoomToFit = useCallback(() => {
     if (!editor) return;
     try {
-      editor.zoomToFit({ animation: { duration: 250 } });
+      editor.zoomToFit({ animation: { duration: reduceMotion ? 0 : 250 } });
     } catch (err) {
       // Fallback
     }
-  }, [editor]);
+  }, [editor, reduceMotion]);
 
   const handleResetZoom = useCallback(() => {
     if (!editor) return;
     try {
-      editor.resetZoom();
+      editor.resetZoom(undefined, { animation: { duration: reduceMotion ? 0 : 200 } });
     } catch (err) {
       // Fallback
     }
-  }, [editor]);
+  }, [editor, reduceMotion]);
 
   const handleUndo = useCallback(() => {
     if (!editor) return;
@@ -102,7 +104,8 @@ export const AppleViewportPill: React.FC<AppleViewportPillProps> = ({ editor }) 
   return (
     <aside
       aria-label="Viewport and History Controls"
-      className="fixed bottom-6 left-6 z-[300] flex items-center gap-0.5 p-1.5 rounded-[18px] liquid-glass-pill select-none"
+      data-canvas-chrome="viewport"
+      className="studio-canvas-chrome fixed bottom-6 left-6 z-[300] flex items-center gap-0.5 p-1.5 liquid-glass-pill select-none"
     >
       {/* Zoom Out Button */}
       <button
@@ -110,7 +113,7 @@ export const AppleViewportPill: React.FC<AppleViewportPillProps> = ({ editor }) 
         title="Zoom Out (Cmd -)"
         aria-label="Zoom Out"
         onClick={handleZoomOut}
-        className="flex items-center justify-center min-w-[40px] min-h-[40px] w-10 h-10 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all active:scale-[0.96]"
+        className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-[color,background-color,transform] active:scale-[0.96]"
       >
         <Minus className="h-[18px] w-[18px]" strokeWidth={1.5} />
       </button>
@@ -119,9 +122,9 @@ export const AppleViewportPill: React.FC<AppleViewportPillProps> = ({ editor }) 
       <button
         type="button"
         title="Reset Zoom to 100% (Shift 0)"
-        aria-label="Reset Zoom"
+        aria-label={`Reset zoom to 100 percent; currently ${formatZoomPercentage(zoomLevel)}`}
         onClick={handleResetZoom}
-        className="flex items-center justify-center min-w-[50px] min-h-[40px] px-2 text-xs font-semibold text-slate-200 hover:text-white tabular-nums hover:bg-white/10 rounded-xl transition-all active:scale-[0.96]"
+        className="flex items-center justify-center min-w-[50px] min-h-[44px] px-2 text-xs font-semibold text-slate-200 hover:text-white tabular-nums hover:bg-white/10 rounded-xl transition-[color,background-color,transform] active:scale-[0.96]"
       >
         <span>{formatZoomPercentage(zoomLevel)}</span>
       </button>
@@ -132,7 +135,7 @@ export const AppleViewportPill: React.FC<AppleViewportPillProps> = ({ editor }) 
         title="Zoom In (Cmd +)"
         aria-label="Zoom In"
         onClick={handleZoomIn}
-        className="flex items-center justify-center min-w-[40px] min-h-[40px] w-10 h-10 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all active:scale-[0.96]"
+        className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-[color,background-color,transform] active:scale-[0.96]"
       >
         <Plus className="h-[18px] w-[18px]" strokeWidth={1.5} />
       </button>
@@ -143,7 +146,7 @@ export const AppleViewportPill: React.FC<AppleViewportPillProps> = ({ editor }) 
         title="Zoom to Fit Content (Shift 1)"
         aria-label="Zoom to Fit"
         onClick={handleZoomToFit}
-        className="flex items-center justify-center min-w-[40px] min-h-[40px] w-10 h-10 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all active:scale-[0.96]"
+        className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-[color,background-color,transform] active:scale-[0.96]"
       >
         <Maximize2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
       </button>
@@ -158,7 +161,7 @@ export const AppleViewportPill: React.FC<AppleViewportPillProps> = ({ editor }) 
         aria-label="Undo"
         onClick={handleUndo}
         disabled={!canUndo}
-        className="flex items-center justify-center min-w-[40px] min-h-[40px] w-10 h-10 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent disabled:pointer-events-none transition-all active:scale-[0.96]"
+        className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent transition-[color,background-color,transform] active:scale-[0.96]"
       >
         <Undo2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
       </button>
@@ -170,7 +173,7 @@ export const AppleViewportPill: React.FC<AppleViewportPillProps> = ({ editor }) 
         aria-label="Redo"
         onClick={handleRedo}
         disabled={!canRedo}
-        className="flex items-center justify-center min-w-[40px] min-h-[40px] w-10 h-10 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent disabled:pointer-events-none transition-all active:scale-[0.96]"
+        className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent transition-[color,background-color,transform] active:scale-[0.96]"
       >
         <Redo2 className="h-[18px] w-[18px]" strokeWidth={1.5} />
       </button>

@@ -1,0 +1,56 @@
+[
+  {
+    "engine": "Chromium",
+    "storage": "persistent",
+    "canvasUsable": true,
+    "dummyKeyUsable": true,
+    "reloadRetainedKey": true,
+    "removalSurvivedReload": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "Chromium",
+    "storage": "session",
+    "canvasUsable": true,
+    "dummyKeyUsable": true,
+    "reloadRetainedKey": true,
+    "removalSurvivedReload": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "Chromium",
+    "storage": "memory",
+    "canvasUsable": true,
+    "dummyKeyUsable": true,
+    "reloadRetainedKey": false,
+    "removalSurvivedReload": false,
+    "pageErrors": []
+  },
+  {
+    "engine": "WebKit",
+    "storage": "persistent",
+    "canvasUsable": true,
+    "dummyKeyUsable": true,
+    "reloadRetainedKey": true,
+    "removalSurvivedReload": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "WebKit",
+    "storage": "session",
+    "canvasUsable": true,
+    "dummyKeyUsable": true,
+    "reloadRetainedKey": true,
+    "removalSurvivedReload": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "WebKit",
+    "storage": "memory",
+    "canvasUsable": true,
+    "dummyKeyUsable": true,
+    "reloadRetainedKey": false,
+    "removalSurvivedReload": false,
+    "pageErrors": []
+  }
+]

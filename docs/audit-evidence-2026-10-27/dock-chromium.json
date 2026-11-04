@@ -1,0 +1,51 @@
+[
+  {
+    "viewport": "640x400 CSS, DPR2 layout approximation",
+    "popup": {
+      "rect": {
+        "x": 172,
+        "y": 12,
+        "right": 412,
+        "bottom": 388,
+        "width": 240,
+        "height": 376
+      },
+      "viewport": {
+        "width": 640,
+        "height": 400
+      },
+      "parentIsBody": true,
+      "overflowY": "auto",
+      "scrollHeight": 423,
+      "clientHeight": 374
+    },
+    "mouseColor": "Coral selected; popup stayed open",
+    "mouseSize": "XL selected; popup stayed open",
+    "escapeFocusReturned": true,
+    "outsideClickDismissed": true
+  },
+  {
+    "viewport": "320x568 CSS touch viewport, DPR2",
+    "popup": {
+      "rect": {
+        "x": 68,
+        "y": 65,
+        "right": 308,
+        "bottom": 490,
+        "width": 240,
+        "height": 425
+      },
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "parentIsBody": true,
+      "overflowY": "auto",
+      "scrollHeight": 432,
+      "clientHeight": 423
+    },
+    "touchColor": "Coral selected; popup stayed open",
+    "touchSize": "XL selected; popup stayed open",
+    "escapeFocusReturned": true
+  }
+]

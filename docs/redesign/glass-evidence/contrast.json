@@ -1,0 +1,16 @@
+{
+  "light": {
+    "primary": 14.82,
+    "secondary": 6.13,
+    "accent": 6.68,
+    "button": 5.75,
+    "control-boundary": 3.64
+  },
+  "dark": {
+    "primary": 17.51,
+    "secondary": 8.54,
+    "accent": 11.4,
+    "button": 9.31,
+    "control-boundary": 4.13
+  }
+}

@@ -1,7 +1,7 @@
+import { AIOrb } from './AIOrb';
 import React from 'react';
 import type { Editor } from '@tldraw/tldraw';
 import {
-  Sparkles,
   AlignHorizontalDistributeCenter,
   AlignVerticalDistributeCenter,
   Grid,
@@ -65,7 +65,7 @@ export const SpatialToolbar: React.FC<SpatialToolbarProps> = ({ editor, spatial 
       <div className="visionos-brand canvasos-brand pointer-events-auto flex items-center gap-3 rounded-2xl liquid-glass-elevated px-3.5 py-2">
         <div className="flex items-center gap-2.5">
           <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 shadow-sm">
-            <Sparkles className="h-3.5 w-3.5 text-white" />
+            <AIOrb className="h-3.5 w-3.5 text-white" />
           </div>
           <div className="flex flex-col">
             <span className="text-xs font-bold tracking-wider text-white">

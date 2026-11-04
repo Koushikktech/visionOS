@@ -1,8 +1,11 @@
 'use client';
 
+import { AIOrb } from './AIOrb';
+
+
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Bot } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { Bot } from 'lucide-react';
 import type { AgentPresenceState, MultiAgentPresenceState } from '../types/spatial';
 
 interface AIAgentCursorProps {
@@ -32,21 +35,22 @@ function SingleCursor({
   role?: string;
   color?: string;
 }) {
+  const reduceMotion = useReducedMotion() ?? false;
   const theme = ROLE_COLORS[color] || ROLE_COLORS['light-blue'];
   const gradId = `agent-grad-${id}`;
 
   return (
     <motion.div
       key={id}
-      initial={{ opacity: 0, scale: 0.5 }}
+      initial={reduceMotion ? false : { opacity: 0, scale: 0.5 }}
       animate={{
         opacity: 1,
         scale: 1,
         x,
         y,
       }}
-      exit={{ opacity: 0, scale: 0.5 }}
-      transition={{
+      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
+      transition={reduceMotion ? { duration: 0 } : {
         type: 'spring',
         damping: 26,
         stiffness: 300,
@@ -86,7 +90,7 @@ function SingleCursor({
           </defs>
         </svg>
         <span className="absolute -bottom-1 -right-1 flex h-2 w-2">
-          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${theme.ping} opacity-75`} />
+          {!reduceMotion && <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${theme.ping} opacity-75`} />}
           <span className={`relative inline-flex rounded-full h-2 w-2 ${theme.ping}`} />
         </span>
       </div>
@@ -94,13 +98,14 @@ function SingleCursor({
       {/* Floating Live Speech Bubble Tooltip */}
       {(statusText || role) && (
         <motion.div
-          initial={{ opacity: 0, y: 5, scale: 0.9 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 5, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#121218]/90 px-3 py-1 text-[11px] font-medium text-white shadow-[0_10px_25px_rgba(0,0,0,0.5)] backdrop-blur-2xl antialiased"
+          transition={reduceMotion ? { duration: 0 } : undefined}
+          className="flex items-center gap-1.5 rounded-full studio-agent-status border px-3 py-1 text-[11px] font-medium text-[var(--studio-text)] backdrop-blur-2xl antialiased"
         >
-          <Sparkles className={`h-3 w-3 ${theme.text}`} strokeWidth={1.5} />
-          {role && <span className="font-semibold text-white/90">{role}:</span>}
-          <span className="tracking-wide text-white/80 truncate max-w-[200px]">{statusText || 'Executing...'}</span>
+          <AIOrb className={`h-3 w-3 ${theme.text}`} strokeWidth={1.5} />
+          {role && <span className="font-semibold text-[var(--studio-text)]">{role}:</span>}
+          <span className="tracking-wide text-[var(--studio-secondary)] truncate max-w-[200px]">{statusText || 'Executing...'}</span>
         </motion.div>
       )}
     </motion.div>
@@ -108,8 +113,9 @@ function SingleCursor({
 }
 
 export const AIAgentCursor: React.FC<AIAgentCursorProps> = ({ presence, multiPresences }) => {
+  const reduceMotion = useReducedMotion() ?? false;
   return (
-    <AnimatePresence>
+    <AnimatePresence initial={!reduceMotion}>
       {/* Primary single presence */}
       {presence && presence.isActive && (
         <SingleCursor

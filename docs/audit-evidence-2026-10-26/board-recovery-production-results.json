@@ -1,0 +1,140 @@
+{
+  "base": "http://127.0.0.1:3005",
+  "engine": "Playwright WebKit headless (not Safari app/device)",
+  "results": [
+    {
+      "mode": "keep",
+      "webkit": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+      "lockManagerPresent": true,
+      "lockProbeInstalled": true,
+      "lockAcquisitions": [
+        "visionos-primarycanvas-recovery-copy",
+        "visionos-primarycanvas-recovery-copy",
+        "visionos-primarycanvas-recovery-copy"
+      ],
+      "seed": {
+        "revision": 1,
+        "records": 2
+      },
+      "liveDocumentDelta": {
+        "revision": 2,
+        "pageName": "Live keep fixture"
+      },
+      "conflictFixture": {
+        "revision": 3,
+        "pageId": "page:page",
+        "pageName": "Recovery keep fixture",
+        "recordCount": 2,
+        "bytes": 172
+      },
+      "reviewFocus": {
+        "initial": true,
+        "tabIntoDialog": true,
+        "reverseBoundaryWrap": true,
+        "escapeReturnsFocus": true
+      },
+      "download": {
+        "format": "visionos-backup",
+        "pageName": "Recovery keep fixture",
+        "bytes": 1775
+      },
+      "keepCurrent": {
+        "revision": 4,
+        "pageName": "Live keep fixture"
+      },
+      "pageErrors": []
+    },
+    {
+      "mode": "restore",
+      "webkit": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+      "lockManagerPresent": true,
+      "lockProbeInstalled": true,
+      "lockAcquisitions": [
+        "visionos-primarycanvas-recovery-copy",
+        "visionos-primarycanvas-recovery-copy",
+        "visionos-primarycanvas-recovery-copy",
+        "visionos-primarycanvas-recovery-copy"
+      ],
+      "seed": {
+        "revision": 1,
+        "records": 2
+      },
+      "liveDocumentDelta": {
+        "revision": 2,
+        "pageName": "Live restore fixture"
+      },
+      "conflictFixture": {
+        "revision": 3,
+        "pageId": "page:page",
+        "pageName": "Recovery restore fixture",
+        "recordCount": 2,
+        "bytes": 175
+      },
+      "review": {
+        "liveName": "Live restore fixture",
+        "recoveryName": "Recovery restore fixture"
+      },
+      "reviewFocus": {
+        "initial": true,
+        "tabIntoDialog": true,
+        "reverseBoundaryWrap": true,
+        "escapeReturnsFocus": true
+      },
+      "download": {
+        "format": "visionos-backup",
+        "pageName": "Recovery restore fixture",
+        "bytes": 1778
+      },
+      "restore": {
+        "revision": 4,
+        "pageName": "Recovery restore fixture"
+      },
+      "c8DurableBackup": {
+        "key": "before-last-restore",
+        "pageName": "Live restore fixture",
+        "savedAt": "2026-10-26T16:47:11.346Z"
+      },
+      "pageErrors": []
+    },
+    {
+      "mode": "stale",
+      "webkit": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+      "lockManagerPresent": true,
+      "lockProbeInstalled": true,
+      "lockAcquisitions": [
+        "visionos-primarycanvas-recovery-copy",
+        "visionos-primarycanvas-recovery-copy",
+        "visionos-primarycanvas-recovery-copy"
+      ],
+      "liveDocumentDelta": {
+        "revision": 2,
+        "pageName": "Live stale fixture"
+      },
+      "conflictFixture": {
+        "revision": 3,
+        "pageId": "page:page",
+        "pageName": "Recovery stale fixture",
+        "recordCount": 2,
+        "bytes": 173
+      },
+      "unannouncedUpdate": {
+        "revision": 4,
+        "pageId": "page:page",
+        "pageName": "Recovery stale latest fixture",
+        "recordCount": 2,
+        "bytes": 180
+      },
+      "staleRestoreRejection": {
+        "message": "The recovery copy changed in another tab. Review the updated copy and choose again.",
+        "livePageStill": "Live stale fixture",
+        "recoveryCopyStill": "Recovery stale latest fixture",
+        "dbRevision": 4
+      },
+      "reviewLatest": {
+        "pageName": "Recovery stale latest fixture",
+        "restoreEnabled": true
+      },
+      "pageErrors": []
+    }
+  ]
+}

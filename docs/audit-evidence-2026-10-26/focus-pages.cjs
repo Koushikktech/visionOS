@@ -1,0 +1,73 @@
+process.env.PLAYWRIGHT_BROWSERS_PATH ??= '/private/tmp/visionos-playwright-browsers';
+const playwrightModule = process.env.PLAYWRIGHT_MODULE || '/Users/koushikk/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright';
+const { webkit } = require(playwrightModule);
+const assert = require('node:assert/strict');
+const base = process.env.VISIONOS_BASE_URL || 'http://127.0.0.1:3006';
+(async () => {
+  const browser = await webkit.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ viewport: { width: 320, height: 568 }, hasTouch: true, isMobile: true });
+    const page = await context.newPage();
+    page.setDefaultTimeout(10000);
+    const errors = [];
+    page.on('pageerror', e => errors.push(String(e)));
+    await page.goto(base, { waitUntil: 'domcontentloaded' });
+    const onboarding = page.locator('[role="dialog"][aria-modal="true"]');
+    await onboarding.waitFor({ state: 'visible' });
+    const initialFocus = await onboarding.locator('[data-dialog-initial-focus]').evaluate(el => el === document.activeElement);
+    assert.equal(initialFocus, true, 'onboarding step heading receives initial focus');
+
+    await page.keyboard.press('Tab');
+    const dismiss = onboarding.getByRole('button', { name: 'Dismiss setup', exact: true });
+    assert.equal(await dismiss.evaluate(el => el === document.activeElement), true, 'Tab from heading enters the first dialog control');
+    await page.keyboard.press('Tab');
+    const connect = onboarding.getByRole('button', { name: /Connect Gemini AI/ });
+    assert.equal(await connect.evaluate(el => el === document.activeElement), true, 'WebKit can focus the dialog control clipped before scroll');
+    const connectVisibility = await connect.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      const clip = el.closest('.visionos-onboarding-scroll').getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, clipTop: clip.top, clipBottom: clip.bottom, scrollTop: el.closest('.visionos-onboarding-scroll').scrollTop };
+    });
+    assert.ok(connectVisibility.top >= connectVisibility.clipTop && connectVisibility.bottom <= connectVisibility.clipBottom, `focused control scrolled into view: ${JSON.stringify(connectVisibility)}`);
+    await page.keyboard.press('Tab');
+    assert.equal(await dismiss.evaluate(el => el === document.activeElement), true, 'Tab from the last control wraps to the first');
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await connect.evaluate(el => el === document.activeElement), true, 'Shift+Tab from the first control wraps to the last');
+    await page.keyboard.press("Enter");
+    await page.getByRole('heading', { name: /Connect Google Gemini/ }).waitFor();
+    await page.keyboard.press('Tab');
+    assert.equal(await onboarding.evaluate(el => el.contains(document.activeElement)), true, 'Tab remains inside onboarding on step 2');
+    await page.getByRole('button', { name: /Continue/ }).tap();
+    await page.getByRole('heading', { name: /All Set/ }).waitFor();
+    await page.keyboard.press('Escape');
+    await onboarding.waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: 'Open visionOS Spatial AI', exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => localStorage.getItem('visionos_onboarded_v1')), 'true', 'Escape finishes onboarding');
+
+    const trigger = page.getByRole('button', { name: /^Pages, current page Page 1$/ });
+    await trigger.tap();
+    const popover = page.getByRole('dialog', { name: 'Pages', exact: true });
+    await popover.waitFor({ state: 'visible' });
+    const bounds = await popover.evaluate(el => { const r=el.getBoundingClientRect(); return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height,viewport:{width:innerWidth,height:innerHeight},parentIsBody:el.parentElement===document.body,overflowY:getComputedStyle(el).overflowY}; });
+    assert.ok(bounds.x >= 0 && bounds.y >= 0 && bounds.right <= 320.5 && bounds.bottom <= 568.5, `Pages popover stays in mobile viewport ${JSON.stringify(bounds)}`);
+    await popover.locator('button[title="Create New Page"]').tap();
+    await popover.getByRole('button', { name: 'Select page Page 2', exact: true }).tap();
+    const page2Trigger = page.getByRole('button', { name: /^Pages, current page Page 2$/ });
+    await page2Trigger.waitFor();
+    await page2Trigger.tap();
+    await popover.waitFor({ state: 'visible' });
+    assert.equal(await popover.getByRole('button', { name: 'Select page Page 2', exact: true }).getAttribute('aria-current'), 'page', 'selected page is exposed semantically');
+    await page.getByRole('button', { name: 'Rename Page 2', exact: true }).tap();
+    await page.getByRole('textbox', { name: 'Rename Page 2', exact: true }).fill('WebKit page');
+    await page.getByRole('textbox', { name: 'Rename Page 2', exact: true }).press('Enter');
+    await page.getByRole('button', { name: 'Select page WebKit page', exact: true }).waitFor();
+    await page.keyboard.press('Escape');
+    await popover.waitFor({ state: 'detached' });
+    const renamedTrigger = page.getByRole('button', { name: /^Pages, current page WebKit page$/ });
+    const focusReturned = await renamedTrigger.evaluate(el => el === document.activeElement);
+    assert.equal(focusReturned, true, 'Escape returns focus to the Pages trigger');
+    assert.equal(errors.length, 0, `no page errors: ${errors.join('; ')}`);
+    console.log(JSON.stringify({engine: await page.evaluate(() => navigator.userAgent), onboarding: {initialFocus, tabInsideAfterHeading:true, clippedControlScrolled:connectVisibility, forwardBoundaryWrap:true, reverseBoundaryWrap:true, stepOneToThree:true, escapePersisted:true}, pages: {bounds, createSelectRename:true, focusReturned}, errors}, null, 2));
+    await context.close();
+  } finally { await browser.close(); }
+})().catch(e => { console.error(e.stack || e); process.exit(1); });

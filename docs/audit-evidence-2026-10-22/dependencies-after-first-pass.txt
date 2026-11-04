@@ -1,0 +1,31 @@
+Post-implementation `bun audit` (22 October 2026)
+
+3 vulnerabilities (1 high, 2 moderate)
+
+postcss-selector-parser <7.1.6
+  Tailwind CSS -> postcss-nested -> postcss-selector-parser
+  Moderate CPU complexity finding. The affected major 6 line is required by the
+  current postcss-nested/Tailwind range; moving to 7.x needs compatibility work.
+  GHSA-rj75-hqrm-r3gf
+
+braces <=3.0.3
+  Tailwind CSS -> micromatch -> braces
+  High stack-exhaustion denial of service finding. No fixed 3.x package was
+  available in the registry at audit time. Upstream discussion:
+  https://github.com/micromatch/braces/issues/84
+  GHSA-vfj7-8cjw-p6xm
+
+@tiptap/core >=2.0.0-alpha.0 <3.30.4
+  tldraw -> @tiptap/core
+  Bun still flags the package because advisory metadata names only 3.30.4 as
+  patched. This workspace resolves @tiptap/core 2.27.3; the upstream maintainer
+  issue documents the v2 backport and its fix:
+  https://github.com/ueberdosis/tiptap/issues/8339
+  GHSA-cp6q-959q-f8rh
+
+The previous 22 findings were reduced through Next.js 15.5.28, compatible
+dependency updates, targeted overrides for patched versions, and removal of
+the redundant @types/dompurify package (DOMPurify ships its own declarations).
+The update removed the two critical Next.js advisories and the applicable
+ProseMirror paste, Sharp, DOMPurify, PostCSS, Markdown-It, source-map-js and
+related findings. A clean audit is not claimed.

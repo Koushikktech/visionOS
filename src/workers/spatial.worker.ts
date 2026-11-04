@@ -7,6 +7,7 @@ import { Solver, Variable, Expression, Constraint, Operator, Strength } from 'ki
 import { stripMarkdownFences } from '../lib/sanitizeHtml';
 import type {
   SpatialNodeItem,
+  SpatialNodePatch,
   SpatialActionFrame,
   WorkerInMessage,
   WorkerOutMessage,
@@ -21,6 +22,7 @@ import type {
   SolvedMediaEmbedItem,
   SolvedVectorItem,
   SolvedDocItem,
+  SolvedDeckItem,
   DocSection,
   CardArchetype,
   SolvedArtifactItem,
@@ -53,6 +55,8 @@ class SpatialIndex extends RBush<SpatialNodeItem> {
 
 const tree = new SpatialIndex();
 const nodeMap = new Map<string, SpatialNodeItem>();
+let indexedPageId: string | null = null;
+let indexedRevision = 0;
 
 // Active streaming sessions state
 interface StreamSessionState {
@@ -69,18 +73,92 @@ interface StreamSessionState {
 const activeSessions = new Map<string, StreamSessionState>();
 
 /**
- * Re-indexes all shapes in the RBush spatial index without wiping in-progress turn nodes
+ * Replaces the spatial index with the current page snapshot. Newly solved items
+ * remain indexed for the rest of their solve batch and join the next snapshot.
  */
-function syncIndex(nodes: SpatialNodeItem[]): number {
-  for (const node of nodes) {
-    const cleanId = node.id.replace(/^shape:/, '');
-    nodeMap.set(node.id, node);
-    nodeMap.set(cleanId, node);
-    nodeMap.set(`shape:${cleanId}`, node);
+function addNodeAliases(node: SpatialNodeItem) {
+  const cleanId = node.id.replace(/^shape:/, '');
+  nodeMap.set(node.id, node);
+  nodeMap.set(cleanId, node);
+  nodeMap.set(`shape:${cleanId}`, node);
+}
+
+function removeIndexedNode(id: string): boolean {
+  const existing = nodeMap.get(id);
+  if (!existing) return false;
+  for (const [key, item] of nodeMap) {
+    if (item === existing) nodeMap.delete(key);
   }
+  tree.remove(existing);
+  return true;
+}
+
+function syncIndex(
+  nodes: SpatialNodeItem[],
+  pageId?: string,
+  revision?: number
+): number {
+  nodeMap.clear();
   tree.clear();
-  tree.load(Array.from(new Set(nodeMap.values())));
-  return nodeMap.size;
+  const indexedNodes = Array.from(new Map(nodes.map((node) => [node.id, node])).values());
+  for (const node of indexedNodes) addNodeAliases(node);
+  tree.load(indexedNodes);
+  indexedPageId = pageId ?? null;
+  indexedRevision = revision ?? 0;
+  return indexedNodes.length;
+}
+
+function patchIndex(
+  pageId: string,
+  revision: number,
+  nodes: SpatialNodePatch[],
+  deletedIds: string[]
+) {
+  if (indexedPageId !== pageId || revision !== indexedRevision + 1) {
+    return {
+      accepted: false as const,
+      expectedRevision: indexedRevision + 1,
+    };
+  }
+
+  const mergedNodes: SpatialNodeItem[] = [];
+  for (const patch of nodes) {
+    const existing = nodeMap.get(patch.id);
+    if (!existing) {
+      if (
+        typeof patch.type !== 'string' ||
+        !Number.isFinite(patch.minX) ||
+        !Number.isFinite(patch.minY) ||
+        !Number.isFinite(patch.maxX) ||
+        !Number.isFinite(patch.maxY)
+      ) {
+        return { accepted: false as const, expectedRevision: indexedRevision + 1 };
+      }
+      mergedNodes.push(patch as SpatialNodeItem);
+    } else {
+      mergedNodes.push({ ...existing, ...patch });
+    }
+  }
+
+  for (const id of deletedIds) removeIndexedNode(id);
+  for (const node of mergedNodes) {
+    removeIndexedNode(node.id);
+    addNodeAliases(node);
+    tree.insert(node);
+  }
+  indexedRevision = revision;
+  return {
+    accepted: true as const,
+    count: new Set(nodeMap.values()).size,
+  };
+}
+
+function intrinsicWidth(node: SpatialNodeItem | undefined, fallback: number) {
+  return node?.intrinsicW ?? (node ? node.maxX - node.minX : fallback);
+}
+
+function intrinsicHeight(node: SpatialNodeItem | undefined, fallback: number) {
+  return node?.intrinsicH ?? (node ? node.maxY - node.minY : fallback);
 }
 
 /**
@@ -101,7 +179,12 @@ function updateInternalNodePosition(id: string, x: number, y: number, w?: number
     maxY: y + currentH,
   };
 
+  tree.remove(existing);
+  for (const [key, item] of nodeMap) {
+    if (item === existing) nodeMap.set(key, updated);
+  }
   nodeMap.set(id, updated);
+  tree.insert(updated);
 }
 
 /**
@@ -170,8 +253,10 @@ function findCollisionFreePosition(
   session?: StreamSessionState,
   margin = 120
 ): { x: number; y: number } {
-  let targetX = viewportCenter?.x ? viewportCenter.x - cardW / 2 : 0;
-  let targetY = viewportCenter?.y ? viewportCenter.y - cardH / 2 : 0;
+  let targetX =
+    viewportCenter?.x !== undefined ? viewportCenter.x - cardW / 2 : 0;
+  let targetY =
+    viewportCenter?.y !== undefined ? viewportCenter.y - cardH / 2 : 0;
   let hasExplicitAnchor = false;
 
   if (relative && relative !== 'center') {
@@ -222,7 +307,8 @@ function findCollisionFreePosition(
   // If no explicit anchor matched, use turn session continuous flow
   if (!hasExplicitAnchor && session && session.lastCreatedX !== undefined && session.lastCreatedY !== undefined) {
     const cardGap = 120;
-    const initialCenterX = viewportCenter?.x ? viewportCenter.x - cardW / 2 : 0;
+    const initialCenterX =
+      viewportCenter?.x !== undefined ? viewportCenter.x - cardW / 2 : 0;
     if (session.rowStartX === undefined) session.rowStartX = initialCenterX;
 
     const currentSpan = (session.lastCreatedX - session.rowStartX) + (session.lastCreatedW || cardW);
@@ -236,9 +322,14 @@ function findCollisionFreePosition(
     }
   }
 
-  // R-Tree Collision Detection & Open-Space Shifting
-  let iterations = 0;
-  while (iterations < 10) {
+  // Move to the right of each colliding cluster until the full candidate is clear.
+  // A fixed ten-step limit could silently return an overlapping position on dense boards.
+  const collisionGap = Number.isFinite(margin) ? Math.max(12, margin) : 120;
+  const indexedNodes = tree.all().filter((item) => item.type !== 'frame');
+  const maxAttempts = indexedNodes.length + 1;
+  let isCollisionFree = false;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const searchBox = {
       minX: targetX - 10,
       minY: targetY - 10,
@@ -246,13 +337,30 @@ function findCollisionFreePosition(
       maxY: targetY + cardH + 10,
     };
     const colliders = tree.search(searchBox).filter((item) => item.type !== 'frame');
-    if (colliders.length === 0) break;
+    if (colliders.length === 0) {
+      isCollisionFree = true;
+      break;
+    }
 
-    // Shift to the right of the colliding cluster
+    // Advance past the rightmost current collider. The extra 12px clears the search padding.
     const maxColliderX = Math.max(...colliders.map((c) => c.maxX));
-    targetX = maxColliderX + margin;
-    iterations++;
+    targetX = Math.max(targetX + 12, maxColliderX + collisionGap + 12);
   }
+
+  if (!isCollisionFree) {
+    // Finite fallback beyond every indexed shape; still verify it before returning.
+    const rightmost = indexedNodes.reduce((maxX, item) => Math.max(maxX, item.maxX), targetX);
+    targetX = Math.max(targetX + 12, rightmost + collisionGap + 12);
+    const fallbackBox = {
+      minX: targetX - 10,
+      minY: targetY - 10,
+      maxX: targetX + cardW + 10,
+      maxY: targetY + cardH + 10,
+    };
+    isCollisionFree = tree.search(fallbackBox).every((item) => item.type === 'frame');
+  }
+
+  if (!isCollisionFree) throw new Error('Could not find a collision-free position for the new card.');
 
   if (session) {
     if (session.rowStartX === undefined) session.rowStartX = targetX;
@@ -522,6 +630,54 @@ function solveCreateDocument(
   return docItem;
 }
 
+function solveCreateSlideDeck(
+  frame: SpatialActionFrame,
+  viewportCenter?: { x: number; y: number },
+  session?: StreamSessionState
+): SolvedDeckItem {
+  const id = frame.id || `deck_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const w = frame.w || 800;
+  const h = frame.h || 500;
+  const { x, y } = findCollisionFreePosition(
+    w,
+    h,
+    frame.relative,
+    viewportCenter,
+    session,
+    frame.margin ?? 120
+  );
+  const deck: SolvedDeckItem = {
+    id,
+    x,
+    y,
+    w,
+    h,
+    title: frame.title ?? 'Presentation Deck',
+    subtitle: frame.subtitle,
+    theme: frame.theme || 'midnight',
+    currentSlideIndex: frame.currentSlideIndex ?? 0,
+    slides: frame.slides || [],
+  };
+  const node: SpatialNodeItem = {
+    id,
+    type: 'slide_deck',
+    minX: x,
+    minY: y,
+    maxX: x + w,
+    maxY: y + h,
+    title: deck.title,
+    subtitle: deck.subtitle,
+    theme: deck.theme,
+    currentSlideIndex: deck.currentSlideIndex,
+    slides: deck.slides,
+  };
+  nodeMap.set(id, node);
+  nodeMap.set(id.replace(/^shape:/, ''), node);
+  nodeMap.set(`shape:${id.replace(/^shape:/, '')}`, node);
+  tree.insert(node);
+  return deck;
+}
+
 /**
  * Calculates geometric coordinates for spawning an interactive code artifact
  */
@@ -770,7 +926,7 @@ function solveAlign(
   const targetNodes: SpatialNodeItem[] = [];
   for (const id of nodeIds) {
     const n = nodeMap.get(id);
-    if (n) targetNodes.push(n);
+    if (n && !n.isLocked) targetNodes.push(n);
   }
 
   if (targetNodes.length === 0) return [];
@@ -902,7 +1058,7 @@ function solveDock(
   const target = nodeMap.get(targetId);
   const anchor = nodeMap.get(groupOrAnchorId);
 
-  if (!target || !anchor) return [];
+  if (!target || !anchor || target.isLocked) return [];
 
   const targetW = target.maxX - target.minX;
   const targetH = target.maxY - target.minY;
@@ -939,63 +1095,200 @@ function solveDock(
   return [{ id: targetId, x: newX, y: newY }];
 }
 
+function parentChainContains(node: SpatialNodeItem, ancestorId: string): boolean {
+  const targetId = ancestorId.replace(/^shape:/, '');
+  let parentId = node.parentId;
+  const visited = new Set<string>();
+  while (parentId && !parentId.startsWith('page:')) {
+    const normalizedParentId = parentId.replace(/^shape:/, '');
+    if (normalizedParentId === targetId) return true;
+    if (visited.has(normalizedParentId)) return false;
+    visited.add(normalizedParentId);
+    const parent = getSpatialNodeById(parentId);
+    if (!parent) return false;
+    parentId = parent.parentId;
+  }
+  return false;
+}
+
+function getSpatialNodeById(id: string): SpatialNodeItem | undefined {
+  const normalizedId = id.replace(/^shape:/, '');
+  return (
+    nodeMap.get(id) ||
+    nodeMap.get(normalizedId) ||
+    nodeMap.get(`shape:${normalizedId}`)
+  );
+}
+
+function isSpatialContainer(node: SpatialNodeItem): boolean {
+  return node.type === 'frame' || node.type === 'group';
+}
+
+function areHierarchyRelated(a: SpatialNodeItem, b: SpatialNodeItem): boolean {
+  return parentChainContains(a, b.id) || parentChainContains(b, a.id);
+}
+
+function candidateOverlapsNode(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  obstacle: SpatialNodeItem,
+  gap: number
+): boolean {
+  return (
+    x < obstacle.maxX + gap &&
+    x + w + gap > obstacle.minX &&
+    y < obstacle.maxY + gap &&
+    y + h + gap > obstacle.minY
+  );
+}
+
 /**
- * Repels colliding non-related nodes using RBush AABB collision detection & push-out vectors
+ * Finds a free position on one outward lane. Each collision advances beyond the
+ * furthest obstacle on that lane, so a dense chain cannot send peers back into
+ * each other. A child may move only inside its existing frame.
  */
-function solveRepel(anchorId: string, margin = 40): SolvedNodeCoordinate[] {
-  const anchor = nodeMap.get(anchorId);
-  if (!anchor) return [];
+function findRepelPosition(
+  anchor: SpatialNodeItem,
+  node: SpatialNodeItem,
+  margin: number,
+  direction: 'right' | 'left' | 'down' | 'up'
+): { x: number; y: number } | undefined {
+  const w = node.maxX - node.minX;
+  const h = node.maxY - node.minY;
+  let x = node.minX;
+  let y = node.minY;
 
-  const searchBox = {
-    minX: anchor.minX - margin,
-    minY: anchor.minY - margin,
-    maxX: anchor.maxX + margin,
-    maxY: anchor.maxY + margin,
-  };
+  if (direction === 'right') x = anchor.maxX + margin;
+  if (direction === 'left') x = anchor.minX - w - margin;
+  if (direction === 'down') y = anchor.maxY + margin;
+  if (direction === 'up') y = anchor.minY - h - margin;
 
-  const colliders = tree.search(searchBox).filter((item) => item.id !== anchorId);
-  if (colliders.length === 0) return [];
+  const parent = node.parentId && !node.parentId.startsWith('page:')
+    ? getSpatialNodeById(node.parentId)
+    : undefined;
+  const maxAdvances = tree.all().length + 1;
+  for (let attempt = 0; attempt < maxAdvances; attempt++) {
+    if (
+      parent &&
+      isSpatialContainer(parent) &&
+      (x < parent.minX || y < parent.minY || x + w > parent.maxX || y + h > parent.maxY)
+    ) {
+      return undefined;
+    }
 
-  const results: SolvedNodeCoordinate[] = [];
-  const anchorCenterX = (anchor.minX + anchor.maxX) / 2;
-  const anchorCenterY = (anchor.minY + anchor.maxY) / 2;
+    const collisions = tree
+      .search({
+        minX: x - margin,
+        minY: y - margin,
+        maxX: x + w + margin,
+        maxY: y + h + margin,
+      })
+      .filter(
+        (obstacle) =>
+        obstacle.id !== node.id &&
+        !areHierarchyRelated(node, obstacle) &&
+        candidateOverlapsNode(x, y, w, h, obstacle, margin)
+      );
+    if (collisions.length === 0) return { x, y };
 
-  for (const node of colliders) {
-    const nodeCenterX = (node.minX + node.maxX) / 2;
-    const nodeCenterY = (node.minY + node.maxY) / 2;
-
-    const dx = nodeCenterX - anchorCenterX;
-    const dy = nodeCenterY - anchorCenterY;
-
-    const nodeW = node.maxX - node.minX;
-    const nodeH = node.maxY - node.minY;
-    const anchorW = anchor.maxX - anchor.minX;
-    const anchorH = anchor.maxY - anchor.minY;
-
-    const minDistanceX = (anchorW + nodeW) / 2 + margin;
-    const minDistanceY = (anchorH + nodeH) / 2 + margin;
-
-    const overlapX = minDistanceX - Math.abs(dx);
-    const overlapY = minDistanceY - Math.abs(dy);
-
-    if (overlapX > 0 && overlapY > 0) {
-      let shiftX = 0;
-      let shiftY = 0;
-
-      if (overlapX < overlapY) {
-        shiftX = dx >= 0 ? overlapX : -overlapX;
-      } else {
-        shiftY = dy >= 0 ? overlapY : -overlapY;
-      }
-
-      const newX = node.minX + shiftX;
-      const newY = node.minY + shiftY;
-      results.push({ id: node.id, x: newX, y: newY });
-      updateInternalNodePosition(node.id, newX, newY);
+    if (direction === 'right') {
+      x = Math.max(...collisions.map((item) => item.maxX)) + margin;
+    } else if (direction === 'left') {
+      x = Math.min(...collisions.map((item) => item.minX)) - w - margin;
+    } else if (direction === 'down') {
+      y = Math.max(...collisions.map((item) => item.maxY)) + margin;
+    } else {
+      y = Math.min(...collisions.map((item) => item.minY)) - h - margin;
     }
   }
 
-  return results;
+  return undefined;
+}
+
+/**
+ * Moves only unlocked non-container peers. Every accepted placement is clear
+ * of the anchor, remaining peers and fixed obstacles before the index changes.
+ */
+interface RepelSolveResult {
+  nodes: SolvedNodeCoordinate[];
+  unresolvedCount: number;
+}
+
+function repelActionSummary(movedCount: number, unresolvedCount: number): string {
+  if (unresolvedCount === 0)
+    return `Repelled ${movedCount} colliding elements`;
+  const total = movedCount + unresolvedCount;
+  if (movedCount === 0)
+    return `Could not repel ${unresolvedCount} of ${total} colliding elements; no safe position was available`;
+  return `Repelled ${movedCount} of ${total} colliding elements; ${unresolvedCount} remain in place because no safe position was available`;
+}
+
+function solveRepel(anchorId: string, margin = 40): RepelSolveResult {
+  const anchor = nodeMap.get(anchorId);
+  if (!anchor) return { nodes: [], unresolvedCount: 0 };
+  const gap = Number.isFinite(margin) ? Math.max(0, margin) : 40;
+  const searchBox = {
+    minX: anchor.minX - gap,
+    minY: anchor.minY - gap,
+    maxX: anchor.maxX + gap,
+    maxY: anchor.maxY + gap,
+  };
+  const candidates = tree
+    .search(searchBox)
+    .filter(
+      (item) =>
+        item.id !== anchor.id &&
+        !item.isLocked &&
+        !isSpatialContainer(item) &&
+        candidateOverlapsNode(
+          item.minX,
+          item.minY,
+          item.maxX - item.minX,
+          item.maxY - item.minY,
+          anchor,
+          gap
+        ) &&
+        !areHierarchyRelated(anchor, item)
+    )
+    .sort((a, b) =>
+      a.minY - b.minY || a.minX - b.minX || a.id.localeCompare(b.id)
+    );
+  const results: SolvedNodeCoordinate[] = [];
+
+  for (const candidate of candidates) {
+    const node = nodeMap.get(candidate.id) || candidate;
+    // Try the least-disruptive directions first. The stable order resolves
+    // exact center ties without random movement across repeated runs.
+    const directions: Array<'right' | 'left' | 'down' | 'up'> = [
+      'right', 'left', 'down', 'up',
+    ];
+    directions.sort((a, b) => {
+      const distance = (direction: typeof a) => {
+        if (direction === 'right') return Math.max(0, anchor.maxX + gap - node.minX);
+        if (direction === 'left') return Math.max(0, node.maxX - (anchor.minX - gap));
+        if (direction === 'down') return Math.max(0, anchor.maxY + gap - node.minY);
+        return Math.max(0, node.maxY - (anchor.minY - gap));
+      };
+      return distance(a) - distance(b);
+    });
+
+    let position: { x: number; y: number } | undefined;
+    for (const direction of directions) {
+      position = findRepelPosition(anchor, node, gap, direction);
+      if (position) break;
+    }
+    if (!position || (position.x === node.minX && position.y === node.minY)) continue;
+
+    results.push({ id: node.id, x: position.x, y: position.y });
+    updateInternalNodePosition(node.id, position.x, position.y);
+  }
+
+  return {
+    nodes: results,
+    unresolvedCount: candidates.length - results.length,
+  };
 }
 
 /**
@@ -1132,8 +1425,8 @@ function solveSingleFrame(
         color: frame.color || existing?.color || 'light-blue',
         x: existing?.minX || 0,
         y: existing?.minY || 0,
-        w: existing ? existing.maxX - existing.minX : 540,
-        h: existing ? existing.maxY - existing.minY : 340,
+        w: intrinsicWidth(existing, 540),
+        h: intrinsicHeight(existing, 340),
         isStreaming: false,
       };
       if (existing) {
@@ -1183,10 +1476,14 @@ function solveSingleFrame(
         code: frame.code || existing?.code || '',
         color: frame.color || existing?.color || 'light-violet',
         storage: frame.storage || existing?.storage || {},
-        x: existing?.minX ?? (viewportCenter?.x ? viewportCenter.x - 390 : 0),
-        y: existing?.minY ?? (viewportCenter?.y ? viewportCenter.y - 270 : 0),
-        w: frame.w || (existing ? existing.maxX - existing.minX : 780),
-        h: frame.h || (existing ? existing.maxY - existing.minY : 540),
+        x:
+          existing?.minX ??
+          (viewportCenter?.x !== undefined ? viewportCenter.x - 390 : 0),
+        y:
+          existing?.minY ??
+          (viewportCenter?.y !== undefined ? viewportCenter.y - 270 : 0),
+        w: frame.w ?? intrinsicWidth(existing, 780),
+        h: frame.h ?? intrinsicHeight(existing, 540),
       };
       if (existing) {
         existing.title = artifact.title;
@@ -1230,8 +1527,8 @@ function solveSingleFrame(
         color: frame.color || existing?.color || 'light-blue',
         x: existing?.minX || 0,
         y: existing?.minY || 0,
-        w: existing ? existing.maxX - existing.minX : 480,
-        h: existing ? existing.maxY - existing.minY : 320,
+        w: intrinsicWidth(existing, 480),
+        h: intrinsicHeight(existing, 320),
       };
       if (existing) {
         existing.title = mediaEmbed.title;
@@ -1274,8 +1571,8 @@ function solveSingleFrame(
         color: frame.color || existing?.color || 'light-violet',
         x: existing?.minX || 0,
         y: existing?.minY || 0,
-        w: existing ? existing.maxX - existing.minX : 240,
-        h: existing ? existing.maxY - existing.minY : 180,
+        w: intrinsicWidth(existing, 240),
+        h: intrinsicHeight(existing, 180),
       };
       if (existing) {
         existing.title = vector.title;
@@ -1319,8 +1616,8 @@ function solveSingleFrame(
         sections: frame.sections || existing?.sections || [],
         x: existing?.minX || 0,
         y: existing?.minY || 0,
-        w: existing ? existing.maxX - existing.minX : 680,
-        h: existing ? existing.maxY - existing.minY : 520,
+        w: intrinsicWidth(existing, 680),
+        h: intrinsicHeight(existing, 520),
       };
       if (existing) {
         existing.title = docItem.title;
@@ -1339,6 +1636,55 @@ function solveSingleFrame(
       };
     }
 
+    case 'create_slide_deck': {
+      const deck = solveCreateSlideDeck(
+        frame,
+        viewportCenter || session?.viewportCenter,
+        session
+      );
+      const duration = performance.now() - start;
+      return {
+        op: 'create_slide_deck',
+        deck,
+        executionTimeMs: Number(duration.toFixed(2)),
+        actionSummary: `Created presentation deck (${deck.slides.length} slides): "${deck.title}"`,
+        rawFrame: frame,
+      };
+    }
+
+    case 'mutate_slide_deck': {
+      const target = frame.target || frame.id || '';
+      const existing = nodeMap.get(target);
+      const duration = performance.now() - start;
+      const deck: SolvedDeckItem = {
+        id: target,
+        title: frame.title ?? existing?.title ?? 'Presentation Deck',
+        subtitle: frame.subtitle !== undefined ? frame.subtitle : existing?.subtitle,
+        theme: frame.theme ?? existing?.theme ?? 'midnight',
+        currentSlideIndex: frame.currentSlideIndex ?? existing?.currentSlideIndex ?? 0,
+        slides: frame.slides || existing?.slides || [],
+        x: existing?.minX ?? 0,
+        y: existing?.minY ?? 0,
+        w: intrinsicWidth(existing, 800),
+        h: intrinsicHeight(existing, 500),
+      };
+      if (existing) {
+        existing.title = deck.title;
+        existing.subtitle = deck.subtitle;
+        existing.theme = deck.theme;
+        existing.currentSlideIndex = deck.currentSlideIndex;
+        existing.slides = deck.slides;
+        nodeMap.set(target, existing);
+      }
+      return {
+        op: 'mutate_slide_deck',
+        deck,
+        executionTimeMs: Number(duration.toFixed(2)),
+        actionSummary: `Updated presentation deck: "${deck.title}"`,
+        rawFrame: frame,
+      };
+    }
+
     case 'mutate_rich_card': {
       const target = frame.target || frame.id || '';
       const existing = nodeMap.get(target);
@@ -1351,8 +1697,8 @@ function solveSingleFrame(
         color: frame.color || existing?.color || 'light-blue',
         x: existing?.minX || 0,
         y: existing?.minY || 0,
-        w: existing ? existing.maxX - existing.minX : 480,
-        h: existing ? existing.maxY - existing.minY : 320,
+        w: intrinsicWidth(existing, 480),
+        h: intrinsicHeight(existing, 320),
         isStreaming: false,
       };
       if (existing) {
@@ -1375,9 +1721,15 @@ function solveSingleFrame(
     case 'resize_shape': {
       const existing = nodeMap.get(frame.target!);
       if (!existing) throw new Error('Target no longer exists.');
+      if (existing.isLocked) throw new Error('Unlock the target before moving it.');
       const x=frame.x ?? existing.minX, y=frame.y ?? existing.minY;
       const w=frame.w ?? existing.maxX-existing.minX,h=frame.h ?? existing.maxY-existing.minY;
-      Object.assign(existing,{minX:x,minY:y,maxX:x+w,maxY:y+h});
+      updateInternalNodePosition(existing.id, x, y, w, h);
+      const updated = nodeMap.get(existing.id) || existing;
+      if (frame.op === 'resize_shape') {
+        updated.intrinsicW = w;
+        updated.intrinsicH = h;
+      }
       return {op:frame.op,nodes:[{id:existing.id,x,y,
         ...(frame.op === 'resize_shape' ? {w:frame.w,h:frame.h} : {})}], executionTimeMs:0,actionSummary:'Updated geometry',rawFrame:frame};
     }
@@ -1412,13 +1764,14 @@ function solveSingleFrame(
     case 'repel_colliding': {
       const anchor = frame.anchor || frame.id || frame.target || '';
       if (anchor) {
-        const coords = solveRepel(anchor, frame.margin ?? 40);
+        const repel = solveRepel(anchor, frame.margin ?? 40);
+        const coords = repel.nodes;
         const duration = performance.now() - start;
         return {
           op: 'repel_colliding',
           nodes: coords,
           executionTimeMs: Number(duration.toFixed(2)),
-          actionSummary: `Repelled ${coords.length} colliding elements`,
+          actionSummary: repelActionSummary(coords.length, repel.unresolvedCount),
           rawFrame: frame,
         };
       }
@@ -1688,8 +2041,40 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
   try {
     switch (msg.type) {
       case 'SYNC_INDEX': {
-        const count = syncIndex(msg.nodes);
-        self.postMessage({ type: 'INDEX_SYNCED', count } satisfies WorkerOutMessage);
+        const count = syncIndex(msg.nodes, msg.pageId, msg.revision);
+        self.postMessage({
+          type: 'INDEX_SYNCED',
+          count,
+          pageId: msg.pageId,
+          revision: msg.revision,
+        } satisfies WorkerOutMessage);
+        break;
+      }
+
+      case 'PATCH_INDEX': {
+        const result = patchIndex(
+          msg.pageId,
+          msg.revision,
+          msg.nodes,
+          msg.deletedIds
+        );
+        if (!result.accepted) {
+          self.postMessage({
+            type: 'INDEX_RESYNC_REQUIRED',
+            pageId: msg.pageId,
+            expectedRevision: result.expectedRevision,
+            receivedRevision: msg.revision,
+          } satisfies WorkerOutMessage);
+          break;
+        }
+        self.postMessage({
+          type: 'INDEX_PATCHED',
+          count: result.count,
+          pageId: msg.pageId,
+          revision: msg.revision,
+          updatedCount: msg.nodes.length,
+          deletedCount: msg.deletedIds.length,
+        } satisfies WorkerOutMessage);
         break;
       }
 
@@ -1704,6 +2089,7 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
         const mediaEmbeds: SolvedMediaEmbedItem[] = [];
         const vectors: SolvedVectorItem[] = [];
         const documents: SolvedDocItem[] = [];
+        const decks: SolvedDeckItem[] = [];
         const groups: SolvedGroupItem[] = [];
         const connectors: SolvedConnectorItem[] = [];
         const textMutations: SolvedTextMutation[] = [];
@@ -1738,6 +2124,7 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
           if (solved.mediaEmbed) mediaEmbeds.push(solved.mediaEmbed);
           if (solved.vector) vectors.push(solved.vector);
           if (solved.document) documents.push(solved.document);
+          if (solved.deck) decks.push(solved.deck);
           if (solved.nodes) solvedNodes.push(...solved.nodes);
           if (solved.group) groups.push(solved.group);
           if (solved.connector) connectors.push(solved.connector);
@@ -1762,6 +2149,7 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
             mediaEmbeds,
             vectors,
             documents,
+            decks,
             groups,
             connectors,
             textMutations,
@@ -1823,6 +2211,7 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
         const duration = performance.now() - startTime;
         self.postMessage({
           type: 'LAYOUT_SOLVED',
+          requestId: msg.requestId,
           result: {
             nodes: solved,
             executionTimeMs: Number(duration.toFixed(2)),
@@ -1838,6 +2227,7 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
         const duration = performance.now() - startTime;
         self.postMessage({
           type: 'LAYOUT_SOLVED',
+          requestId: msg.requestId,
           result: {
             nodes: solved,
             executionTimeMs: Number(duration.toFixed(2)),
@@ -1849,14 +2239,16 @@ self.onmessage = (e: MessageEvent<WorkerInMessage>) => {
 
       case 'REPEL_COLLISIONS': {
         const startTime = performance.now();
-        const solved = solveRepel(msg.anchorId, msg.margin);
+        const repel = solveRepel(msg.anchorId, msg.margin);
+        const solved = repel.nodes;
         const duration = performance.now() - startTime;
         self.postMessage({
           type: 'LAYOUT_SOLVED',
+          requestId: msg.requestId,
           result: {
             nodes: solved,
             executionTimeMs: Number(duration.toFixed(2)),
-            actionSummary: `Repelled ${solved.length} colliding elements`,
+            actionSummary: repelActionSummary(solved.length, repel.unresolvedCount),
           },
         } satisfies WorkerOutMessage);
         break;

@@ -1,0 +1,44 @@
+{
+  "dark primary/workspace": {
+    "colors": [
+      "#f2f3f5",
+      "#121416"
+    ],
+    "contrast": 16.63
+  },
+  "dark secondary/raised": {
+    "colors": [
+      "#a6adb5",
+      "#1b1e22"
+    ],
+    "contrast": 7.38
+  },
+  "dark control boundary/raised": {
+    "colors": [
+      "#737c87",
+      "#1b1e22"
+    ],
+    "contrast": 3.95
+  },
+  "light primary/workspace": {
+    "colors": [
+      "#202327",
+      "#f4f5f6"
+    ],
+    "contrast": 14.45
+  },
+  "light secondary/raised": {
+    "colors": [
+      "#606872",
+      "#ffffff"
+    ],
+    "contrast": 5.64
+  },
+  "light control boundary/raised": {
+    "colors": [
+      "#7b838d",
+      "#ffffff"
+    ],
+    "contrast": 3.84
+  }
+}

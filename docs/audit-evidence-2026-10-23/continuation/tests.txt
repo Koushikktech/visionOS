@@ -1,0 +1,531 @@
+bun test v1.3.14 (0d9b296a)
+
+src/test/geometrySizingChallenge.test.ts:
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Concentric Border Radii: outer = inner + padding > verifies ContextualFormattingPill outer=[18px], inner=12px (rounded-xl), padding=6px (p-1.5) [0.19ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Concentric Border Radii: outer = inner + padding > verifies AppleFloatingDock outer=[20px], inner=12px (rounded-xl), padding=8px (p-2) [0.09ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Concentric Border Radii: outer = inner + padding > verifies SpatialAIOmnibar outer=[32px], inner=16px (rounded-2xl), padding=16px (p-4) [0.07ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Concentric Border Radii: outer = inner + padding > verifies AppleFloatingDock popovers adhere to concentric radius formula [0.22ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Concentric Border Radii: outer = inner + padding > verifies SpatialAIOmnibar Action Menu popover adheres to concentric radius formula [0.06ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Touch Targets (>= 44x44px) and Tactile Scale Feedback (active:scale-[0.96]) > verifies color swatches in ContextualFormattingPill meet >= 44x44px and active:scale-[0.96] [0.07ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Touch Targets (>= 44x44px) and Tactile Scale Feedback (active:scale-[0.96]) > verifies all quick formatting buttons in ContextualFormattingPill meet >= 44x44px and active:scale-[0.96] [0.26ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Touch Targets (>= 44x44px) and Tactile Scale Feedback (active:scale-[0.96]) > verifies popover buttons in AppleFloatingDock meet >= 44x44px and active:scale-[0.96] [0.29ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Touch Targets (>= 44x44px) and Tactile Scale Feedback (active:scale-[0.96]) > verifies the slide pager exposes accessible 44px previous, next, and numeric controls [0.18ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Touch Targets (>= 44x44px) and Tactile Scale Feedback (active:scale-[0.96]) > verifies SpatialAIOmnibar top controls and action menu buttons meet >= 44x44px and active:scale-[0.96] [0.21ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Tabular Numbers: font-variant-numeric: tabular-nums > verifies tabular numerals are applied to displayed stat values and slide indexes [0.05ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Tabular Numbers: font-variant-numeric: tabular-nums > keeps tabular numeral styling on numeric display elements without depending on an occurrence count [0.07ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Tabular Numbers: font-variant-numeric: tabular-nums > verifies global CSS defines .tabular-nums correctly [0.04ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Global Anti-Regression Invariants > verifies zero occurrences of scale-[0.98] across all implementation files in src/ [2.90ms]
+(pass) Challenger 2 Round 2: Empirical Geometry & Sizing Stress Test > Global Anti-Regression Invariants > verifies zero sub-40px button classes in ContextualFormattingPill and AppleFloatingDock [0.18ms]
+
+src/test/hud.test.ts:
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Floating Island Dock Tool Mappings > contains all 10 canonical floating island dock tools without duplicates [0.53ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Floating Island Dock Tool Mappings > correctly maps standard tldraw tool selections to editor.setCurrentTool [0.08ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Floating Island Dock Tool Mappings > correctly handles rich_card spawner tool at viewport center [0.03ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Floating Island Dock Tool Mappings > correctly handles clear tool by deleting selected shapes or clearing [0.02ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Floating Island Dock Tool Mappings > remains resilient when editor instance is null [0.02ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Zoom Indicator & Tabular Percentage Formatting > formats zoom levels accurately into rounded percentage strings [0.04ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Zoom Indicator & Tabular Percentage Formatting > handles non-numeric or NaN zoom fallbacks gracefully
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Zoom Indicator & Tabular Percentage Formatting > verifies zoom in and zoom out modifications on the viewport pill [0.02ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Zoom Indicator & Tabular Percentage Formatting > verifies undo and redo capability states on viewport pill [0.73ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Zoom Indicator & Tabular Percentage Formatting > verifies tabular-nums utility class format ensures non-proportional digit alignment [0.06ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Color Swatch Palette & DefaultColorStyle Mapping > verifies every HUD color swatch maps to a valid tldraw DefaultColorStyle value [0.02ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Color Swatch Palette & DefaultColorStyle Mapping > includes all primary tldraw spectrum colors in the swatch palette [0.02ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Color Swatch Palette & DefaultColorStyle Mapping > verifies each swatch has valid hex representation and human-readable label [0.03ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Color Swatch Palette & DefaultColorStyle Mapping > dispatches style changes to selected shapes via editor.setStyleForSelectedShapes [0.02ms]
+(pass) HUD & Floating Canvas Chrome Suite (src/test/hud.test.ts) > Color Swatch Palette & DefaultColorStyle Mapping > verifies ContextualFormattingPill popover geometry, air gap, and text editing suppression [0.37ms]
+
+src/test/workerProtocol.test.ts:
+(pass) Actual worker action protocol > preserves regeneration identity, position, size and storage [0.68ms]
+(pass) Actual worker action protocol > uses intrinsic dimensions when regenerating a rotated artifact inside a frame [0.04ms]
+(pass) Actual worker action protocol > rejects an unknown target instead of updating the first app [0.17ms]
+(pass) Actual worker action protocol > does not discard delete, restyle, or focus batch results [0.04ms]
+(pass) Actual worker action protocol > aligns real indexed nodes without overlap [0.61ms]
+(pass) Actual worker action protocol > echoes direct layout request IDs for guarded application [0.10ms]
+(pass) Actual worker action protocol > supports explicit move and resize actions [0.04ms]
+(pass) Actual worker action protocol > never moves locked collision neighbors [0.24ms]
+(pass) Actual worker action protocol > repels identical-center peers without creating peer collisions [0.25ms]
+(pass) Actual worker action protocol > pushes peers beyond dense obstacle chains while keeping negative coordinates valid [0.26ms]
+(pass) Actual worker action protocol > keeps nested peers inside their unlocked parent frame and leaves locked peers fixed [0.09ms]
+(pass) Actual worker action protocol > keeps grouped peers inside a mixed-format group parent and does not move the group [0.06ms]
+(pass) Actual worker action protocol > does not move a child across its frame or move descendants of a frame anchor [0.05ms]
+(pass) Actual worker action protocol > reports peers left in place when a full parent frame has no safe repel position [0.03ms]
+(pass) Actual worker action protocol > preserves document sections for metadata-only updates [0.02ms]
+(pass) Actual worker action protocol > creates and then mutates a native presentation deck in one worker batch [0.18ms]
+(pass) Actual worker action protocol > keeps existing deck placement and intrinsic size during AI replacement [0.05ms]
+(pass) Actual worker action protocol > finds a verified open slot beyond more than ten chained obstacles [0.14ms]
+(pass) Actual worker action protocol > replaces prior page entries when syncing the index [0.07ms]
+(pass) Actual worker action protocol > applies only the next page revision and rejects stale worker patches [0.16ms]
+[spatial-sync benchmark] 300 source-heavy nodes: 3963990 full-sync bytes vs 134 one-node patch bytes; worker 0.32ms full / 0.22ms patch
+(pass) Actual worker action protocol > measures one-node sync payload and actual worker update cost on a dense source page [2.49ms]
+
+src/test/routes.test.ts:
+(pass) API Route Schemas & Error Handling Suite (src/test/routes.test.ts) > Make Real API Route (/api/ai/make-real) > returns 400 when image data is completely missing [2.07ms]
+(pass) API Route Schemas & Error Handling Suite (src/test/routes.test.ts) > Make Real API Route (/api/ai/make-real) > returns 401 when Gemini provider is selected without an API key [0.23ms]
+(pass) API Route Schemas & Error Handling Suite (src/test/routes.test.ts) > Make Real API Route (/api/ai/make-real) > returns 401 when OpenRouter provider is selected without an API key [0.10ms]
+(pass) API Route Schemas & Error Handling Suite (src/test/routes.test.ts) > Make Real API Route (/api/ai/make-real) > handles malformed JSON body gracefully [0.11ms]
+(pass) API Route Schemas & Error Handling Suite (src/test/routes.test.ts) > Spatial AI Chat API Route (/api/ai/chat) > returns 401 when Gemini provider has no API key supplied [0.69ms]
+(pass) API Route Schemas & Error Handling Suite (src/test/routes.test.ts) > Spatial AI Chat API Route (/api/ai/chat) > returns 401 when OpenRouter provider has no API key supplied [0.12ms]
+(pass) API Route Schemas & Error Handling Suite (src/test/routes.test.ts) > Spatial AI Chat API Route (/api/ai/chat) > returns 400 when request body is empty or invalid JSON [0.27ms]
+(pass) API Route Schemas & Error Handling Suite (src/test/routes.test.ts) > Spatial Stream API Route (/api/ai/spatial-stream) > returns 400 when culledContext is missing from request body [0.22ms]
+(pass) API Route Schemas & Error Handling Suite (src/test/routes.test.ts) > Spatial Stream API Route (/api/ai/spatial-stream) > streams spatial action frames when given valid organize intent and selected nodes [0.50ms]
+(pass) API Route Schemas & Error Handling Suite (src/test/routes.test.ts) > Spatial Stream API Route (/api/ai/spatial-stream) > streams connection frames when given valid connect intent [0.14ms]
+(pass) API Route Schemas & Error Handling Suite (src/test/routes.test.ts) > Swarm > rejects malformed requests instead of fabricating completed work [0.58ms]
+
+src/test/clipboard.test.ts:
+(pass) Spatial AI copy feedback result > reports success only after the Clipboard API resolves [0.12ms]
+(pass) Spatial AI copy feedback result > uses the selection-copy fallback after clipboard permission is denied [0.10ms]
+(pass) Spatial AI copy feedback result > does not report success when neither clipboard path succeeds [0.02ms]
+
+src/test/shapeConcentricity.test.ts:
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Custom Shapes Type Integrity > verifies all 7 custom shapes match their registered tldraw type [0.03ms]
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Concentric Radius Math on Custom Shapes > enforces concentric radius rule (outer = inner + padding) on rich_card [0.02ms]
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Concentric Radius Math on Custom Shapes > enforces concentric radius rule (outer = inner + padding) on code_card
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Concentric Radius Math on Custom Shapes > enforces concentric radius rule (outer = inner + padding) on document
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Concentric Radius Math on Custom Shapes > enforces concentric radius rule (outer = inner + padding) on slide_deck
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Concentric Radius Math on Custom Shapes > enforces concentric radius rule (outer = inner + padding) on artifact
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Concentric Radius Math on Custom Shapes > enforces concentric radius rule (outer = inner + padding) on vector_shape
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Concentric Radius Math on Custom Shapes > enforces concentric radius rule (outer = inner + padding) on media_embed
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Concentric Radius Math on Custom Shapes > validates concentric nested formulas across variable border and padding configurations [0.01ms]
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Slide Numbers Tabular Formatting > formats slide numbers correctly with safeIdx + 1 / slides.length [0.02ms]
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Slide Numbers Tabular Formatting > clamps negative indices and out-of-bounds slide indices safely
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Slide Numbers Tabular Formatting > verifies slide number string contains required delimiters and structure [0.01ms]
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Latency Badges Tabular Formatting > formats latency badge numbers into rounded integer ms strings [0.02ms]
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Latency Badges Tabular Formatting > handles negative, NaN, or non-numeric latency inputs safely
+(pass) Shape Concentricity & Tabular Numbers Suite (src/test/shapeConcentricity.test.ts) > Latency Badges Tabular Formatting > verifies latency strings end with ms suffix and have valid digits [0.03ms]
+
+src/test/designTokens.test.ts:
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Concentric Border Radii Formula > calculates outer radius accurately for standard container combinations [0.02ms]
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Concentric Border Radii Formula > handles boundary and edge cases without producing invalid radii [0.02ms]
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Concentric Border Radii Formula > calculates inner radius inversely and satisfies mathematical symmetry [0.03ms]
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Touch / Click Target Minimums > enforces desktop touch target constant >= 40px
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Touch / Click Target Minimums > enforces mobile / standard recommended touch target >= 44px
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Touch / Click Target Minimums > enforces tactile press scale of 0.96 with motion restraint
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Touch / Click Target Minimums > configures Apple spring with duration 0.3 and zero bounce
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Touch / Click Target Minimums > defines standard Apple fluid easing curve
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Icon Stroke Weight Matching Rules > matches 1.5px stroke beside regular 400 text
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Icon Stroke Weight Matching Rules > matches 2.0px stroke beside semibold 600 text
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Icon Stroke Weight Matching Rules > maintains correct optical weight ratio between regular and semibold
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Icon Stroke Weight Matching Rules > maps font weights dynamically to appropriate stroke weights [0.01ms]
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Obsidian Glass Values & HIG Opacity Ranges > verifies dock glass background opacity is within range 0.78 to 0.85 [0.05ms]
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Obsidian Glass Values & HIG Opacity Ranges > verifies dock glass specular border opacity is within range 0.08 to 0.12
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Obsidian Glass Values & HIG Opacity Ranges > verifies pill glass opacity is within range 0.78 to 0.85 and border in 0.08 to 0.12
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Obsidian Glass Values & HIG Opacity Ranges > verifies card glass opacity is within range 0.78 to 0.85 and border in 0.08 to 0.12
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Obsidian Glass Values & HIG Opacity Ranges > verifies card header border opacity is within range 0.08 to 0.12
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Obsidian Glass Values & HIG Opacity Ranges > verifies elevated and popover glass surfaces have specular borders in 0.08 to 0.12
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Apple Typography Stacks > enforces SF Pro system font stack for sans
+(pass) Design Tokens & HIG Compliance Suite (src/test/designTokens.test.ts) > Apple Typography Stacks > enforces SF Mono system font stack for mono
+
+src/test/omnibar.test.ts:
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Concentric Border Radii Contracts > verifies Siri panel outer radius to inner card concentricity
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Concentric Border Radii Contracts > verifies input pill nested concentricity
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Tactile Touch Target & Motion Contracts > enforces touch targets >= 40x40px on all circular and action buttons
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Tactile Touch Target & Motion Contracts > enforces tactile press scale of 0.96
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Tactile Touch Target & Motion Contracts > enforces Apple-grade spring physics without bounce
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Tactile Touch Target & Motion Contracts > enforces matched icon stroke weights for regular and semibold text
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Liquid Glass Obsidian Tokens & HIG Opacities > verifies elevated and dock glass surfaces are deep obsidian with specular highlight
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Component Exports & Module Integrity > exports SpatialAIOmnibar as a valid React component
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Component Exports & Module Integrity > keeps the AI panel as a valid AnimatePresence child inside its portal [0.46ms]
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Component Exports & Module Integrity > exports SpeculativeSkeletonOverlay as a valid React component
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Component Exports & Module Integrity > exports AIAgentCursor as a valid React component
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Component Exports & Module Integrity > exports VisionOnboardingModal as a valid React component and validates Gemini presets [0.02ms]
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Component Exports & Module Integrity > verifies getGeminiModelCandidateChain prioritizes gemini-3.8-flash and includes robust fallbacks [0.05ms]
+(pass) visionOS SpatialAIOmnibar & Surface Revamp Suite (src/test/omnibar.test.ts) > Component Exports & Module Integrity > verifies action badges compress long shape IDs into clean readable badges [0.03ms]
+
+src/test/empiricalStress.test.ts:
+(pass) Empirical Adversarial & Edge Case Stress Suite > Extreme Zoom Level Handling > accurately formats extreme zoom values specified in dispatch (0.01 and 10.0) [0.02ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Extreme Zoom Level Handling > handles fractional micro-zooms and ultra-zooms without rounding drift [0.02ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Extreme Zoom Level Handling > handles negative zoom levels defensively if viewport ever inverts
+(pass) Empirical Adversarial & Edge Case Stress Suite > Extreme Zoom Level Handling > handles non-numeric, null, undefined, and NaN inputs by defaulting to 100%
+(pass) Empirical Adversarial & Edge Case Stress Suite > Extreme Zoom Level Handling > verifies extreme zoom transitions on the mock editor bounds (0.01 to 10.0) [0.08ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Defensive Null Editor Handling > returns empty fallback structure from getSpatialGroundedContext when editor is null [0.05ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Defensive Null Editor Handling > safely handles null editor in all AppleFloatingDock actions [0.03ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Defensive Null Editor Handling > safely handles null editor in all AppleViewportPill actions [0.02ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Defensive Null Editor Handling > safely handles null editor in ContextualFormattingPill calculations [0.03ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Selection Changes & Coordinate Clamping > returns null position when no shapes are selected [0.01ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Selection Changes & Coordinate Clamping > computes correct hover coordinate for a single selected shape [0.04ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Selection Changes & Coordinate Clamping > computes composite union bounding box across multiple selected shapes [0.03ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Selection Changes & Coordinate Clamping > gracefully returns null when all selected shapes have null bounds [0.01ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Selection Changes & Coordinate Clamping > clamps screen coordinates to keep pill within visible viewport [0.01ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Undo/Redo Disabled States and Transitions > correctly reports canUndo=false and canRedo=false on a fresh canvas [0.01ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Undo/Redo Disabled States and Transitions > updates canUndo and canRedo on undo and redo executions [0.02ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Undo/Redo Disabled States and Transitions > safely tolerates repeated calls when canUndo or canRedo is false [0.02ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Shape Creation Coordinates Oracle > places all 5 custom shapes exactly centered at the viewport center [0.05ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Formatting & HIG Utilities Defense > verifies formatSlideNumber defensively clamps against underflow and overflow [0.01ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Formatting & HIG Utilities Defense > verifies formatLatencyBadge handles negative, zero, and high latency values
+(pass) Empirical Adversarial & Edge Case Stress Suite > Formatting & HIG Utilities Defense > verifies all 8 Contextual Color Swatches map to valid tldraw colors [0.01ms]
+(pass) Empirical Adversarial & Edge Case Stress Suite > Formatting & HIG Utilities Defense > verifies concentric math invariants with stress inputs
+
+src/test/mvpProtocol.test.ts:
+(pass) MVP protocol behavior > rejects malformed actions, missing targets, invalid colors, bounds and URLs [0.33ms]
+(pass) MVP protocol behavior > rejects truncated or prose-only HTML [0.05ms]
+(pass) MVP protocol behavior > accepts storage only from the owning iframe and bounds payloads [0.07ms]
+(pass) MVP protocol behavior > serializes hierarchy, z-order, document sections and real arrow bindings [0.25ms]
+(pass) MVP protocol behavior > parses chunked UTF-8 and trailing SSE without losing final tool calls [0.45ms]
+(pass) MVP protocol behavior > relays Gemini native mutation in an unterminated SSE event [1.44ms]
+(pass) MVP protocol behavior > accumulates OpenRouter arguments split across chunks [0.40ms]
+(pass) MVP protocol behavior > never emits actions in Chat only mode, even if provider violates the tools setting [0.36ms]
+(pass) MVP protocol behavior > reports malformed tool arguments and truncation without completion [0.23ms]
+(pass) MVP protocol behavior > regenerates from full source without requiring an iframe screenshot [0.19ms]
+[VisionOS Make Real] Error: 422 |     }
+423 | 
+424 |     const resJson = await geminiRes.json();
+425 |     const candidate = resJson.candidates?.[0];
+426 |     if (candidate?.finishReason === 'MAX_TOKENS')
+427 |       throw new Error('Generation was truncated. Try a smaller app or request.');
+                      ^
+error: Generation was truncated. Try a smaller app or request.
+      at POST (/Users/koushikk/Documents/projects/visionOS/src/app/api/ai/make-real/route.ts:427:17)
+      at async <anonymous> (/Users/koushikk/Documents/projects/visionOS/src/test/mvpProtocol.test.ts:369:23)
+
+(pass) MVP protocol behavior > rejects partial generated apps instead of replacing working content [0.18ms]
+
+src/test/artifactSanitizer.test.ts:
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > leaves pure HTML untouched without modification [0.01ms]
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > strips standard ```html ... ``` fences [0.02ms]
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > strips ```xml and ``` fences [0.02ms]
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > strips bare ``` ... ``` fences without language tag
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > extracts code block from surrounding conversational preamble and outro text [0.01ms]
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > safely handles unclosed leading code fence (e.g. streaming or truncated response)
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > safely handles empty, null, or whitespace-only code
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > strips rogue leading and trailing backticks [0.01ms]
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > extracts code when conversational preamble exists with an unclosed fence
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > preserves valid JavaScript template literals within HTML script tags
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > Interactive App Iframe Pinch-to-Zoom Interception & Camera Anchoring > emits the pinch/wheel and Safari gesture bridge before app code and validates it in the host [0.23ms]
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > Interactive App Iframe Pinch-to-Zoom Interception & Camera Anchoring > mathematically proves anchor point invariance during canvas zoom under cursor [0.02ms]
+(pass) Artifact Code Sanitizer & Markdown Stripping Suite (src/test/artifactSanitizer.test.ts) > Interactive App Iframe Pinch-to-Zoom Interception & Camera Anchoring > verifies exponential zoom delta scaling is symmetric and clamped between 0.05 and 8.0 [0.01ms]
+
+src/test/adversarial_geometry_constraints.test.ts:
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Window Resize Minimum Constraints (Artifact min 480x360, SlideDeck min 640x480) > enforces min 480x360 on ArtifactShapeUtil with extreme negative scales [0.04ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Window Resize Minimum Constraints (Artifact min 480x360, SlideDeck min 640x480) > enforces min 480x360 on ArtifactShapeUtil with zero and sub-minimum positive scales [0.02ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Window Resize Minimum Constraints (Artifact min 480x360, SlideDeck min 640x480) > enforces min 480x360 on ArtifactShapeUtil with asymmetric scale deltas [0.02ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Window Resize Minimum Constraints (Artifact min 480x360, SlideDeck min 640x480) > enforces min 640x480 on SlideDeckShapeUtil with extreme negative scales [0.02ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Window Resize Minimum Constraints (Artifact min 480x360, SlideDeck min 640x480) > enforces min 640x480 on SlideDeckShapeUtil with zero and sub-minimum positive scales [0.01ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Window Resize Minimum Constraints (Artifact min 480x360, SlideDeck min 640x480) > enforces min 640x480 on SlideDeckShapeUtil with asymmetric scale deltas [0.01ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Window Resize Minimum Constraints (Artifact min 480x360, SlideDeck min 640x480) > property-based fuzzing: 200 random deltas always satisfy min dimensions [0.18ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Touch Targets (>= 44x44px) and Tactile Feedback (scale-[0.96]) > verifies ApplePagesPill interactive buttons meet >= 44x44px and scale-[0.96] [0.24ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Touch Targets (>= 44x44px) and Tactile Feedback (scale-[0.96]) > verifies AppleViewportPill interactive buttons meet >= 44x44px and active:scale-[0.96] [0.08ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Touch Targets (>= 44x44px) and Tactile Feedback (scale-[0.96]) > verifies ContextualFormattingPill buttons meet >= 44x44px and active:scale-[0.96] [0.22ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Touch Targets (>= 44x44px) and Tactile Feedback (scale-[0.96]) > verifies AppleFloatingDock primary tools and popovers meet >= 44x44px and active:scale-[0.96] [0.42ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Touch Targets (>= 44x44px) and Tactile Feedback (scale-[0.96]) > verifies SpatialAIOmnibar controls meet >= 44x44px and active:scale-[0.96] [0.18ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Touch Targets (>= 44x44px) and Tactile Feedback (scale-[0.96]) > verifies zero occurrences of scale-[0.98] across all source files in src/ [1.88ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric math for AppleFloatingDock container: 20 = 12 + 8 [0.02ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric math for AppleFloatingDock Geo Popover: 20 = 12 + 8
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric math for AppleFloatingDock Cards Popover: 20 = 12 + 8
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric math for AppleFloatingDock Subchoosers: 20 = 12 + 8
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric math for ContextualFormattingPill container: 18 = 12 + 6
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric math for ContextualFormattingPill Popovers: 18 = 12 + 6
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric math for AppleViewportPill container: 18 = 12 + 6
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric math for ApplePagesPill Export Popover: 20 = 12 + 8
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric math for ApplePagesPill Pages Drawer: 24 = 12 + 12
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric math for SpatialAIOmnibar Panel: 32 = 16 + 16
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric math for SpatialAIOmnibar Action Menu Popover: 20 = 12 + 8
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Concentric Radii Formula: R_outer = R_inner + Padding (Zero Geometric Divergence) > verifies concentric radius token declarations in source components [0.20ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Iframe Marquee Pointer Events Blocking (.canvas-is-dragging) > verifies globals.css enforces pointer-events: none !important during canvas drag [0.05ms]
+(pass) Challenger 2: Adversarial Geometry, Touch Targets & Constraints Suite > Iframe Marquee Pointer Events Blocking (.canvas-is-dragging) > verifies Canvas.tsx manages canvas-is-dragging class on documentElement and wrapper [0.04ms]
+
+src/test/overlayViewport.test.ts:
+(pass) visible viewport and floating toolbar geometry > uses the visual viewport offsets and size when the browser keyboard resizes it [0.02ms]
+(pass) visible viewport and floating toolbar geometry > clamps a measured toolbar for giant selections with offscreen anchors [0.05ms]
+(pass) visible viewport and floating toolbar geometry > keeps toolbar placement inside a keyboard-shortened viewport [0.01ms]
+(pass) visible viewport and floating toolbar geometry > anchors an oversized toolbar to the safe edge instead of a guessed center offset
+(pass) visible viewport and floating toolbar geometry > keeps a long toolbar scroll box and its open menu inside a 320 by 250 viewport [0.03ms]
+
+src/test/adversarial_preview.test.ts:
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > strips 4+ backticks fences (````html ... ````) [0.02ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > strips 4+ backticks with file metadata info strings (e.g. ````html:app.html)
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > strips tildes fences (~~~, ~~~~, ~~~~~)
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > safely handles unclosed code blocks from truncated or streaming outputs [0.01ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > strips conversational reasoning preambles and outros surrounding code fences [0.01ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > extracts unclosed code blocks preceded by conversational reasoning text
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > extracts full HTML documents embedded directly in conversational text without code fences
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > extracts pure <html> document without doctype from conversational text
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > handles multiple sequential code blocks by cleanly extracting the primary HTML block
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > handles Windows CRLF (\r\n) newlines and edge-case whitespace cleanly
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > preserves valid JavaScript template literals and backticks inside HTML scripts
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 1. Markdown Fence Stripping Resilience > safely handles non-string, empty, null, or whitespace-only inputs without throwing [0.01ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 2. Speculative Skeleton Placement & Collision Avoidance > places skeleton immediately to the right for standard bounds (w <= 900) [0.13ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 2. Speculative Skeleton Placement & Collision Avoidance > places skeleton directly beneath sketch for wide bounds (w > 900) [0.04ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 2. Speculative Skeleton Placement & Collision Avoidance > honors custom desired width and height dimensions [0.07ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 2. Speculative Skeleton Placement & Collision Avoidance > diverts placement below sketch when right position collides with existing shape [0.07ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 2. Speculative Skeleton Placement & Collision Avoidance > cascades downward past obstacles when both right and below are blocked [0.05ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 2. Speculative Skeleton Placement & Collision Avoidance > finds collision-free placement in a dense field of 20 randomized existing shapes [0.05ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 2. Speculative Skeleton Placement & Collision Avoidance > ignores shapes that are within the sketch bounds itself (self-bounds filtering) [0.02ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 2. Speculative Skeleton Placement & Collision Avoidance > robustly calculates placement for negative and extreme canvas coordinates [0.02ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 3. Virtual localStorage Debouncing & High-Frequency Stress > debounces 100 rapid writes within 10ms to a single update with zero data loss [351.51ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 3. Virtual localStorage Debouncing & High-Frequency Stress > resets debounce timer on successive writes and flushes 300ms after the LAST write [676.61ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 3. Virtual localStorage Debouncing & High-Frequency Stress > immediately flushes pending storage on unmount before debounce timer fires (zero data loss on unmount) [362.35ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 3. Virtual localStorage Debouncing & High-Frequency Stress > deduplicates identical content without scheduling unnecessary update timers [0.33ms]
+(pass) Empirical Adversarial Challenge Suite: Sanitization, Skeletons & Storage > 3. Virtual localStorage Debouncing & High-Frequency Stress > rejects malformed, spoofed, or adversarial storage messages via readStorageMessage [0.76ms]
+
+src/hooks/useShapeDraft.test.ts:
+(pass) shape draft recovery records > round-trips a bounded draft within its tab scope and clears only that scope [0.59ms]
+(pass) shape draft recovery records > ignores corrupted roots and invalid records without breaking later writes [0.25ms]
+(pass) shape draft recovery records > validates recovered data against the persisted shape schema [0.16ms]
+
+src/hooks/viewportGeometry.test.ts:
+(pass) floating popover viewport placement > keeps a dock menu within a tablet viewport when the anchor sits near the bottom [0.71ms]
+(pass) floating popover viewport placement > clamps a menu horizontally in a narrow visible viewport [0.06ms]
+(pass) floating popover viewport placement > centers the selection toolbar when a large card leaves no room above or below [0.05ms]
+
+src/lib/pointerIntent.test.ts:
+(pass) primary pointer action intent > requires a matching primary left-button press and release [0.11ms]
+(pass) primary pointer action intent > does not treat a secondary-button press as an action intent [0.02ms]
+(pass) primary pointer action intent > cancels a pointer that moves beyond the click threshold [0.04ms]
+(pass) primary pointer action intent > cancels a pointer that leaves the action control or is cancelled by the browser [0.03ms]
+
+src/lib/spatialSourceContract.test.ts:
+(pass) spatial source revision contract > accepts a full selected source only while the current source is that revision [0.83ms]
+(pass) spatial source revision contract > rejects preview-only, missing, and wrong-type replacement sources [0.36ms]
+(pass) spatial source revision contract > rejects a stale target revision before applying replacement [0.05ms]
+(pass) spatial source revision contract > blocks AI replacement while the target has a dirty local source draft [0.08ms]
+(pass) spatial source revision contract > blocks full document replacement while its recovered content draft is dirty [0.14ms]
+(pass) spatial source revision contract > requires the selected complete deck source and blocks a dirty deck draft [0.46ms]
+(pass) spatial source revision contract > preserves uneditable forward metadata on retained slides during full AI replacement [0.16ms]
+(pass) spatial source revision contract > rejects create-ID reuse and duplicate IDs in a batch [0.11ms]
+(pass) spatial source revision contract > allows a later replacement of a complete object created earlier in the same batch [0.05ms]
+
+src/lib/workspaceBackup.test.ts:
+(pass) workspace backup safety > round-trips real document/deck shapes and preserves app data while pausing imported apps [12.00ms]
+(pass) workspace backup safety > migrates supported v1 optional nested fields and rejects malformed hostile values [5.25ms]
+(pass) workspace backup safety > defaults an omitted current page before exercising tldraw session loading and replaces live records [6.63ms]
+(pass) workspace backup safety > rejects duplicate IDs, out-of-range dimensions, nonfinite geometry, and oversized content [1.66ms]
+(pass) workspace backup safety > embeds accessible bounded local image bytes and reports nonportable references [2.27ms]
+(pass) workspace backup safety > detects duplicate raw JSON keys before parsing, and aborts a restore if live edits race the recovery write [1.06ms]
+(pass) workspace backup safety > rolls back only after live loading starts and rejects untrusted portability metadata [1.52ms]
+(pass) workspace backup safety > emits no imported records to tldraw persistence listeners after a failed loader [3.18ms]
+(pass) workspace backup safety > keeps edits made during durable app-storage epoch preparation and rolls the namespace back [1.58ms]
+(pass) workspace backup safety > flushes debounced app mutations into the durable recovery copy before restore starts [2.17ms]
+
+src/lib/artifactRuntime.test.ts:
+(pass) artifact runtime policy and source preparation > revokes network opt-in only when a saved app source changes [3.59ms]
+(pass) artifact runtime policy and source preparation > limits requests by default without claiming to block self-navigation [0.06ms]
+(pass) artifact runtime policy and source preparation > places host CSP and bootstrap before hostile or malformed generated markup [0.06ms]
+(pass) artifact runtime policy and source preparation > strips markdown fences before installing the policy and app source [0.02ms]
+(pass) artifact runtime policy and source preparation > keeps legacy CDN-dependent fragments blocked until network is enabled [0.30ms]
+(pass) artifact runtime policy and source preparation > escapes source data embedded into the storage bridge script [0.06ms]
+(pass) artifact runtime policy and source preparation > announces a changed app store promptly, coalesces the notice, then sends one snapshot [0.38ms]
+
+src/lib/mediaEmbed.test.ts:
+(pass) media embed provider validation > accepts known YouTube URL forms on exact supported hosts [0.13ms]
+(pass) media embed provider validation > rejects lookalike hosts, malformed IDs, unsafe protocols, and credentials [0.02ms]
+(pass) media embed provider validation > does not pretend arbitrary web sites can be embedded [0.03ms]
+
+src/lib/contentEditing.test.ts:
+(pass) content editor validation > accepts a true empty document and rejects duplicate or over-limit sections [0.15ms]
+(pass) content editor validation > permits an empty deck, validates nested timeline step bounds, and preserves legacy fields [0.16ms]
+(pass) content editor validation > keeps persisted records within the original backup envelope loadable [0.38ms]
+(pass) content export helpers > exports document metadata, section IDs, badges, and Markdown bodies [0.05ms]
+(pass) content export helpers > exports every deck content field in Markdown and structured JSON [0.15ms]
+(pass) content export helpers > moves items only when both positions are in bounds [0.03ms]
+(pass) content export helpers > bounds and sanitizes download names derived from titles [0.04ms]
+
+src/lib/artifactStorage.test.ts:
+(pass) artifact storage message validation > accepts only messages from the owning iframe and matching shape [0.05ms]
+(pass) artifact storage message validation > rejects invalid values, long keys, too many entries, and oversized snapshots with reasons [0.22ms]
+(pass) artifact storage message validation > retains special property names as ordinary keys without changing the prototype [0.03ms]
+
+src/lib/spatialVision.test.ts:
+(pass) spatialVision utilities > extractBase64 > extracts mimeType and raw base64 from a PNG Data URL [0.42ms]
+(pass) spatialVision utilities > extractBase64 > extracts mimeType and raw base64 from a JPEG Data URL [0.02ms]
+(pass) spatialVision utilities > extractBase64 > handles raw base64 strings gracefully defaulting to image/png
+(pass) spatialVision utilities > extractPlainTextFromRichText > returns undefined for empty, null, or invalid inputs [0.01ms]
+(pass) spatialVision utilities > extractPlainTextFromRichText > returns trimmed string for string inputs
+(pass) spatialVision utilities > extractPlainTextFromRichText > extracts nested text blocks from tldraw v3 richText AST [0.02ms]
+(pass) spatialVision utilities > extractShapeSemanticText > extracts content from rich card props
+(pass) spatialVision utilities > extractShapeSemanticText > extracts text from standard shapes
+(pass) spatialVision utilities > extractShapeSemanticText > extracts text from richText AST in props [0.01ms]
+(pass) spatialVision utilities > extractShapeSemanticText > extracts sections from document shapes [0.01ms]
+(pass) spatialVision utilities > extractShapeSemanticText > extracts code snippet from code card props
+(pass) spatialVision utilities > calculateMakeRealPlacement > places artifact to the right of standard-sized bounds using Kiwi solver [0.11ms]
+(pass) spatialVision utilities > calculateMakeRealPlacement > places artifact below wide sketches (>900px wide) using Kiwi solver [0.04ms]
+(pass) spatialVision utilities > calculateMakeRealPlacement > honors custom desired width and height dimensions when provided [0.03ms]
+(pass) spatialVision utilities > calculateMakeRealPlacement > avoids collision with existing canvas shapes to prevent overlapping [0.08ms]
+(pass) spatialVision utilities > getSpatialGroundedContext > returns empty fallback structure when editor is null [0.02ms]
+(pass) spatialVision utilities > getSpatialGroundedContext > extracts grounded context from an editor instance mock [0.10ms]
+
+src/lib/artifactStoragePersistence.test.ts:
+(pass) artifact storage durability coordination > uses a collision-resistant exact-source fingerprint without storing the source [0.23ms]
+(pass) artifact storage durability coordination > drains active writes and holds queued writes until restore releases the workspace [0.22ms]
+(pass) artifact storage durability coordination > cancels queued initialization after its owning app becomes stale [0.04ms]
+
+src/lib/launchRecovery.test.ts:
+(pass) canvas launch recovery status > keeps the initial state as loading [0.01ms]
+(pass) canvas launch recovery status > offers recovery after a long-running load without treating it as a failure
+(pass) canvas launch recovery status > prioritizes a rejected client chunk over the loading timeout
+
+src/lib/artifactStorageAcknowledgement.test.ts:
+(pass) artifact storage acknowledgement tracking > keeps a net-zero mutation burst pending until a durable ack arrives [0.05ms]
+(pass) artifact storage acknowledgement tracking > does not let an older transaction ack settle a newer mutation [0.02ms]
+(pass) artifact storage acknowledgement tracking > resets pending state when a new source or workspace session begins [0.03ms]
+
+src/lib/canvasGesturePolicy.test.ts:
+(pass) canvas gesture policy > keeps pinch zoom on the canvas only when the pointer is over the drawing surface [0.02ms]
+(pass) canvas gesture policy > allows vertical native pan only from explicitly scrollable canvas content [0.01ms]
+
+src/lib/selectionCapabilities.test.ts:
+(pass) selection capability resolution > applies styles only to supported shapes and reports skipped custom or locked shapes [0.11ms]
+(pass) selection capability resolution > expands groups while respecting inherited locks and deduplicating nested children [0.04ms]
+(pass) selection capability resolution > rejects cross-parent layout and filters locked items before grouping [0.07ms]
+(pass) selection capability resolution > skips groups with locked descendants before any sibling move or grouping [0.03ms]
+(pass) selection capability resolution > never ungroups locked groups or groups containing locked descendants [0.04ms]
+(pass) selection capability resolution > rejects ungrouping groups from different parents [0.03ms]
+
+src/lib/deckPptxExport.test.ts:
+(pass) editable PPTX export > writes mixed fields for every layout into distinct editable OOXML regions [170.44ms]
+
+src/lib/artifactStorageHydration.test.ts:
+(pass) artifact storage hydration reconciliation > keeps recovered app data while board props remain at the older snapshot [0.50ms]
+(pass) artifact storage hydration reconciliation > accepts a genuinely newer board change while recovery is pending [0.02ms]
+(pass) artifact storage hydration reconciliation > resets the fence when a source or workspace starts a new hydration [0.02ms]
+
+src/lib/spatialContext.test.ts:
+(pass) spatial page serialization > keeps only deck count in nearby context while retaining selected source elsewhere [0.06ms]
+(pass) spatial page serialization > retains intrinsic dimensions and inherited lock state for rotated shapes [0.12ms]
+(pass) spatial page serialization > reuses exact source provenance for geometry-only worker deltas [0.06ms]
+(pass) spatial page serialization > keeps source and storage out of unchanged-content geometry patches [0.05ms]
+(pass) spatial page serialization > refreshes descendant bounds and inherited lock state after an ancestor transform [0.06ms]
+(pass) spatial page serialization > refreshes arrow binding endpoints on geometry patches despite cached props [0.03ms]
+(pass) spatial page serialization > invalidates a pending snapshot after page changes or any shape changes [0.09ms]
+(pass) spatial page serialization > uses immutable record identity for edits, same-id recreation, and undo restoration [0.04ms]
+(pass) spatial page serialization > invalidates a page snapshot when an arrow binding changes without shape edits [0.06ms]
+(pass) spatial page serialization > reuses unchanged source fields while refreshing geometry and caller-owned nodes [0.18ms]
+[C13 300-node host microbenchmark] full node JSON=3922351 bytes (~980588 chars/4 token estimate); unchanged-page source scanned=3897047 chars/pass; whole-page guard median=1.16ms JSON vs 0.03ms record refs; serialize median=4.66ms uncached vs 0.13ms source-cache. Bounds and output JSON are still recomputed/serialized.
+(pass) spatial page serialization > measures whole-page guards and source caching on the 300-node C13 fixture [69.20ms]
+(pass) spatial page serialization > rejects solver-neighbor edits and ancestor lock changes before commit [0.12ms]
+(pass) spatial page serialization > rejects reparenting a child of a locked frame [0.07ms]
+
+src/lib/tokens.test.ts:
+(pass) Design Tokens & Utilities > Concentric Border Radius Calculation > calculates outer radius as inner + padding [0.31ms]
+(pass) Design Tokens & Utilities > Concentric Border Radius Calculation > handles zero padding correctly [0.01ms]
+(pass) Design Tokens & Utilities > Concentric Border Radius Calculation > handles zero inner radius correctly
+(pass) Design Tokens & Utilities > Concentric Border Radius Calculation > handles decimal values accurately
+(pass) Design Tokens & Utilities > Concentric Border Radius Calculation > clamps negative values to non-negative results
+(pass) Design Tokens & Utilities > Concentric Border Radius Calculation > calculates inner radius from outer radius and padding
+(pass) Design Tokens & Utilities > Touch Target Constants > enforces desktop minimum touch target dimension >= 40px
+(pass) Design Tokens & Utilities > Touch Target Constants > enforces mobile / standard recommended touch target dimension >= 44px
+(pass) Design Tokens & Utilities > Tactile Physics & Motion Tokens > defines tactile scale on press as 0.96
+(pass) Design Tokens & Utilities > Tactile Physics & Motion Tokens > configures Apple spring with duration 0.3 and bounce 0
+(pass) Design Tokens & Utilities > Tactile Physics & Motion Tokens > defines Apple fluid easing curve
+(pass) Design Tokens & Utilities > Tactile Physics & Motion Tokens > matches icon stroke weights to text weights
+(pass) Design Tokens & Utilities > Apple Obsidian Glass Tokens > defines dock glass with dark obsidian hues and layered depth shadows [0.02ms]
+(pass) Design Tokens & Utilities > Apple Obsidian Glass Tokens > defines pill glass with subtle top highlight and high blur
+(pass) Design Tokens & Utilities > Apple Obsidian Glass Tokens > defines popover glass with dense obsidian background and deep elevation
+(pass) Design Tokens & Utilities > Apple Obsidian Glass Tokens > defines card, codeBg, and elevated glass tokens cleanly without neon tints
+(pass) Design Tokens & Utilities > Typography Stacks > enforces Apple SF Pro system typography stack for sans
+(pass) Design Tokens & Utilities > Typography Stacks > enforces SF Mono monospace stack for code
+
+src/lib/ai/provider.test.ts:
+(pass) normal Gemini model fallback policy > limits fallback to a known same-family model and keeps unknown IDs exact [0.02ms]
+(pass) normal Gemini model fallback policy > preserves the separate legacy candidate policy used by Swarm [0.01ms]
+(pass) normal Gemini model fallback policy > advances only for structured model availability errors [0.09ms]
+(pass) normal Gemini model fallback policy > recognizes only structured thinking-setting rejection errors [0.04ms]
+
+src/lib/ai/prompt.test.ts:
+(pass) prompt & grounded context utilities > formats selected shapes with full details and grounded context [0.43ms]
+(pass) prompt & grounded context utilities > includes complete editable source for selected decks and only a preview for nearby decks [0.16ms]
+(pass) prompt & grounded context utilities > converts native deck create and full-replacement tool calls [0.03ms]
+(pass) prompt & grounded context utilities > converts spawn_artifact tool call with relative anchor and default 780x540 dimensions [0.03ms]
+(pass) prompt & grounded context utilities > converts spawn_artifact tool call with custom width and height [0.01ms]
+(pass) prompt & grounded context utilities > converts mutate_code_card tool call targeting selected code card [0.01ms]
+(pass) prompt & grounded context utilities > converts connect_shapes tool call between two cards [0.01ms]
+(pass) prompt & grounded context utilities > isCanvasActionIntent > returns false for pure greetings and pleasantries [0.25ms]
+(pass) prompt & grounded context utilities > isCanvasActionIntent > returns false for conversational questions without canvas commands [0.05ms]
+(pass) prompt & grounded context utilities > isCanvasActionIntent > returns true for explicit canvas creation commands [0.05ms]
+(pass) prompt & grounded context utilities > isCanvasActionIntent > returns true for targeted actions when shapes are selected [0.04ms]
+(pass) prompt & grounded context utilities > extractActionFramesFromText > extracts mutate_artifact action frame from raw JSON dumped into text [0.18ms]
+(pass) prompt & grounded context utilities > extractActionFramesFromText > extracts mutate_artifact from raw JSON with unescaped multiline code and attributes [0.17ms]
+(pass) prompt & grounded context utilities > extractActionFramesFromText > extracts spawn_artifact from bare JSON in text without markdown fences [0.03ms]
+(pass) prompt & grounded context utilities > getFrameCleanSummary > returns a factual change summary for mutate_artifact [0.01ms]
+(pass) prompt & grounded context utilities > getFrameCleanSummary > returns a factual change summary for spawn_artifact
+
+src/lib/ai/request.test.ts:
+(pass) AI request runtime schemas > accepts the current client context shape, including optional nested fields [0.15ms]
+(pass) AI request runtime schemas > accepts bounded selected deck source for the native deck tool flow [0.19ms]
+(pass) AI request runtime schemas > rejects malformed nested sections, slides, storage, geometry and snapshot values [0.26ms]
+(pass) AI request runtime schemas > rejects extreme arrays and field sizes with a 413-class validation error [0.07ms]
+(pass) AI request runtime schemas > checks Make Real selected-shape nesting and spatial-stream selection fields [0.12ms]
+(pass) AI request runtime schemas > rejects malformed nested chat input before any provider fetch [0.24ms]
+(pass) AI request runtime schemas > enforces the streaming body cap when Content-Length is absent, before provider work [2.10ms]
+(pass) AI request runtime schemas > bounds provider credential headers before any provider fetch [0.18ms]
+(pass) AI request runtime schemas > does not use configured environment keys for production requests without a client key [0.15ms]
+(pass) AI request runtime schemas > uses a supplied invalid client key instead of falling through to a server key [0.32ms]
+(pass) AI request runtime schemas > forwards the same client key through Swarm planning and its internal chat call [0.40ms]
+(pass) AI request runtime schemas > rejects truncated Gemini swarm plans before dispatching specialists [0.15ms]
+(pass) AI request runtime schemas > rejects an OpenRouter swarm plan without a terminal completion reason [0.12ms]
+(pass) AI request runtime schemas > rejects truncated OpenRouter swarm plans before dispatching specialists [0.11ms]
+
+src/lib/ai/actions.test.ts:
+(pass) native presentation actions > converts and validates a deck creation tool call [0.19ms]
+(pass) native presentation actions > requires a full slide list for deck mutations and rejects malformed content [0.28ms]
+(pass) native presentation actions > bounds slide count and requires an exact target [0.06ms]
+
+src/app/api/ai/chat/route.test.ts:
+[VisionOS] Model gemini-3.8-flash is unavailable (HTTP 404); trying an approved same-family fallback.
+(pass) normal Gemini chat model fallback > reports the actual model after an approved fallback [0.38ms]
+(pass) normal Gemini chat model fallback > does not retry a generic 400 on a different model [0.15ms]
+(pass) normal Gemini chat model fallback > retries a structured unsupported thinking setting on the same model [0.21ms]
+
+src/app/api/ai/make-real/route.test.ts:
+(pass) Make Real API Route (/api/ai/make-real) > returns 400 when image data is missing [0.56ms]
+(pass) Make Real API Route (/api/ai/make-real) > returns 401 when no Gemini API key is provided for Gemini provider [0.08ms]
+(pass) Make Real API Route (/api/ai/make-real) > returns 401 when no OpenRouter API key is provided for OpenRouter provider [0.05ms]
+(pass) Make Real API Route (/api/ai/make-real) > sends Gemini credentials in a header instead of the provider URL [0.20ms]
+Gemini (gemini-3.8-flash) key #1/1 returned HTTP 404: {"error":{"code":404,"status":"NOT_FOUND","message":"models/gemini-3.8-flash is not found"}}
+[VisionOS Make Real] Model gemini-3.8-flash is unavailable (HTTP 404); trying an approved same-family fallback.
+(pass) Make Real API Route (/api/ai/make-real) > falls back only within the same model family and reports the model that succeeded [0.19ms]
+Gemini (gemini-3.8-flash) key #1/1 returned HTTP 400: {"error":{"code":400,"status":"INVALID_ARGUMENT","message":"Invalid argument in request contents"}}
+(pass) Make Real API Route (/api/ai/make-real) > does not retry a generic Gemini 400 on another model [0.15ms]
+(pass) Make Real API Route (/api/ai/make-real) > rejects malformed nested shape context before contacting a provider [0.07ms]
+[VisionOS Make Real] Error: 424 |     const resJson = await geminiRes.json();
+425 |     const candidate = resJson.candidates?.[0];
+426 |     if (candidate?.finishReason === 'MAX_TOKENS')
+427 |       throw new Error('Generation was truncated. Try a smaller app or request.');
+428 |     if (candidate?.finishReason !== 'STOP')
+429 |       throw new Error(
+                      ^
+error: Generation ended without a successful completion signal. Retry.
+      at POST (/Users/koushikk/Documents/projects/visionOS/src/app/api/ai/make-real/route.ts:429:17)
+      at async <anonymous> (/Users/koushikk/Documents/projects/visionOS/src/app/api/ai/make-real/route.test.ts:213:25)
+
+(pass) Make Real API Route (/api/ai/make-real) > does not accept Gemini output without a successful terminal finish reason [0.14ms]
+[VisionOS Make Real] Error: 422 |     }
+423 | 
+424 |     const resJson = await geminiRes.json();
+425 |     const candidate = resJson.candidates?.[0];
+426 |     if (candidate?.finishReason === 'MAX_TOKENS')
+427 |       throw new Error('Generation was truncated. Try a smaller app or request.');
+                      ^
+error: Generation was truncated. Try a smaller app or request.
+      at POST (/Users/koushikk/Documents/projects/visionOS/src/app/api/ai/make-real/route.ts:427:17)
+      at async <anonymous> (/Users/koushikk/Documents/projects/visionOS/src/app/api/ai/make-real/route.test.ts:232:25)
+
+(pass) Make Real API Route (/api/ai/make-real) > rejects Gemini MAX_TOKENS output even if the returned document looks complete [0.11ms]
+[VisionOS Make Real] Error: 279 |       if (choice?.finish_reason === 'length')
+280 |         throw new Error(
+281 |           'Generation was truncated. Try a smaller app or request.'
+282 |         );
+283 |       if (choice?.finish_reason !== 'stop')
+284 |         throw new Error(
+                        ^
+error: Generation ended without a successful completion signal. Retry.
+      at POST (/Users/koushikk/Documents/projects/visionOS/src/app/api/ai/make-real/route.ts:284:19)
+      at async <anonymous> (/Users/koushikk/Documents/projects/visionOS/src/app/api/ai/make-real/route.test.ts:251:25)
+
+(pass) Make Real API Route (/api/ai/make-real) > rejects OpenRouter output with no finish reason [0.11ms]
+[VisionOS Make Real] Error: 275 |       }
+276 | 
+277 |       const resJson = await openRouterRes.json();
+278 |       const choice = resJson.choices?.[0];
+279 |       if (choice?.finish_reason === 'length')
+280 |         throw new Error(
+                        ^
+error: Generation was truncated. Try a smaller app or request.
+      at POST (/Users/koushikk/Documents/projects/visionOS/src/app/api/ai/make-real/route.ts:280:19)
+      at async <anonymous> (/Users/koushikk/Documents/projects/visionOS/src/app/api/ai/make-real/route.test.ts:270:25)
+
+(pass) Make Real API Route (/api/ai/make-real) > rejects truncated OpenRouter output even when it contains complete-looking HTML [0.13ms]
+
+ 386 pass
+ 0 fail
+ 1152297 expect() calls
+Ran 386 tests across 39 files. [2.03s]

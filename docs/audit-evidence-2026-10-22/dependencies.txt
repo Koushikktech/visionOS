@@ -1,0 +1,65 @@
+[0m[1mbun audit [0m[2mv1.3.14 (0d9b296a)[0m
+dompurify  >=3.4.13 <=3.4.15
+  (direct dependency)
+  @types/dompurify › dompurify
+  low: DOMPurify: IN_PLACE: node-removing afterSanitize hook leaves detached subtree event handlers armed, causing DOM XSS - https://github.com/advisories/GHSA-p98j-92pf-mc4p
+  low: DOMPurify: IN_PLACE returns a force-removed rawtext root whose text carries attacker markup — pure HTML reparse executes - https://github.com/advisories/GHSA-6688-9rhm-gjv2
+
+postcss  <=8.5.22
+  (direct dependency)
+  autoprefixer › postcss
+  next › postcss
+  tailwindcss › postcss-nested › postcss
+  moderate: PostCSS: incomplete fix of GHSA-6g55-p6wh-862q — attacker-controlled sourceMappingURL reads arbitrary .map files when `from` is unset - https://github.com/advisories/GHSA-fxqj-rqcc-2cmp
+  moderate: PostCSS has XSS via Unescaped </style> in its CSS Stringify Output - https://github.com/advisories/GHSA-qx2v-qp2m-jg93
+  high: PostCSS: Arbitrary file read and information disclosure via attacker-controlled sourceMappingURL in CSS comments - https://github.com/advisories/GHSA-6g55-p6wh-862q
+  high: PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Arbitrary .map File Disclosure - https://github.com/advisories/GHSA-r28c-9q8g-f849
+
+markdown-it  <14.3.3
+  @tldraw/tldraw › tldraw › @tldraw/editor › @tiptap/react › @tiptap/extension-floating-menu › @tiptap/core › @tiptap/pm › prosemirror-markdown › markdown-it
+  low: markdown-it: Quadratic-time denial of service in inline HTML parsing with html enabled - https://github.com/advisories/GHSA-vfgh-jcmw-g37q
+  high: markdown-it: Quadratic-time rendering of a single multi-line link reference definition with default options (regression since 14.0) - https://github.com/advisories/GHSA-gfr2-rv44-r23c
+  moderate: markdown-it linkify: true has two quadratic paths, so a few hundred KB of markdown blocks the event loop for tens of seconds - https://github.com/advisories/GHSA-253c-mchw-3w2r
+  high: markdown-it: Quadratic complexity in smartquotes with unmatched closing quotes - https://github.com/advisories/GHSA-r7fv-28h4-cvq7
+
+next  >=13.4.0 <15.5.24
+  (direct dependency)
+  critical: Next.js: Unauthenticated Remote Code Execution on windows-hosted servers - https://github.com/advisories/GHSA-p293-qw3h-jr36
+  critical: Next.js: Unauthenticated Remote Code Execution in Image Optimization API when AVIF files are used - https://github.com/advisories/GHSA-2xp9-vwfh-vxw4
+  moderate: Next.js has cache poisoning in SSG/ISR rendering that leads to cross-user content substitution and persistent denial of service - https://github.com/advisories/GHSA-mcj8-r9mp-w47p
+  moderate: Next.js has cache poisoning of SSG and ISR pages in self-hosted applications - https://github.com/advisories/GHSA-4jqv-mc3x-m676
+
+prosemirror-view  <1.42.3
+  @tldraw/tldraw › tldraw › @tldraw/editor › @tiptap/react › @tiptap/extension-floating-menu › @tiptap/core › @tiptap/pm › prosemirror-view › prosemirror-state
+  high: ProseMirror has a XSS vulnerability in prosemirror-view's paste handling - https://github.com/advisories/GHSA-c8x8-7fp4-3x9w
+
+postcss-selector-parser  <7.1.6
+  tailwindcss › postcss-nested › postcss-selector-parser
+  moderate: PostCSS: Quadratic complexity in flat selector parsing allows CPU exhaustion - https://github.com/advisories/GHSA-rj75-hqrm-r3gf
+
+sharp  <0.35.0
+  next › sharp
+  high: sharp inherited vulnerabilities in libvips: CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591 - https://github.com/advisories/GHSA-f88m-g3jw-g9cj
+  high: sharp: Vulnerabilities in libheif: GHSA-g89c-p67h-r497 and GHSA-2jg2-4ch7-h545 - https://github.com/advisories/GHSA-rgj7-g3m4-5g8c
+  high: sharp : Vulnerability in librsvg dependency CVE-2026-96889 - https://github.com/advisories/GHSA-wq5f-xc86-pv6w
+
+braces  <=3.0.3
+  tailwindcss › micromatch › braces
+  high: braces vulnerable to stack-exhaustion denial of service through deeply nested patterns - https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
+
+@tiptap/core  >=2.0.0-alpha.0 <3.30.4
+  @tldraw/tldraw › tldraw › @tldraw/editor › @tiptap/react › @tiptap/extension-floating-menu › @tiptap/core
+  moderate: Tiptap: mergeAttributes() turns an own __proto__ key into inherited executable DOM attributes - https://github.com/advisories/GHSA-cp6q-959q-f8rh
+
+source-map-js  >=1.0.0 <1.2.2
+  postcss › source-map-js
+  high: source-map-js allows event-loop denial of service through indexed source-map section offsets - https://github.com/advisories/GHSA-68fv-2mgg-jv7q
+
+22 vulnerabilities (2 critical, 10 high, 7 moderate, 3 low)
+
+To update all dependencies to the latest compatible versions:
+  bun update
+
+To update all dependencies to the latest versions (including breaking changes):
+  bun update --latest
+

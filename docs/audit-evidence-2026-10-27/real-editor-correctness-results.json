@@ -1,0 +1,46 @@
+[
+  {
+    "engine": "Chromium",
+    "rotationRegenerations": 3,
+    "geometryPreserved": {
+      "x": 220,
+      "y": 120,
+      "w": 360,
+      "h": 240,
+      "rotation": 0.35,
+      "parentId": "shape:rotated-parent",
+      "parent": {
+        "x": 150,
+        "y": 180,
+        "rotation": 0.25,
+        "w": 1000,
+        "h": 700
+      }
+    },
+    "sourceContextComplete": true,
+    "midBatchFailureRolledBack": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "WebKit",
+    "rotationRegenerations": 3,
+    "geometryPreserved": {
+      "x": 220,
+      "y": 120,
+      "w": 360,
+      "h": 240,
+      "rotation": 0.35,
+      "parentId": "shape:rotated-parent",
+      "parent": {
+        "x": 150,
+        "y": 180,
+        "rotation": 0.25,
+        "w": 1000,
+        "h": 700
+      }
+    },
+    "sourceContextComplete": true,
+    "midBatchFailureRolledBack": true,
+    "pageErrors": []
+  }
+]

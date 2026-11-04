@@ -19,19 +19,85 @@ import type {
   SolvedMediaEmbedItem,
   SolvedVectorItem,
   SolvedDocItem,
+  SolvedDeckItem,
   DAGExecutionPlan,
   CardArchetype,
   SolvedArtifactItem,
   SolvedRestyle,
   SolvedActionPayload,
+  SolvedLayoutResult,
   SpeculativeSkeletonBounds,
   ViewportQuery,
   AIIntentPreset,
   AISpatialStreamRequest,
 } from '../types/spatial';
-import { serializeCanvas, compactBoard } from '../lib/spatialContext';
+import {
+  assertSpatialPageSnapshotCurrent,
+  assertShapesUnlockedForReparent,
+  captureSpatialPageSnapshot,
+  compactBoard,
+  createSpatialSerializationCache,
+  isCanvasShapeLocked,
+  matchesSpatialPageSnapshot,
+  serializeCanvas,
+  serializeSpatialShape,
+  spatialNodeGeometryPatch,
+  type SpatialPageSnapshot,
+  type SpatialSerializationCache,
+} from '../lib/spatialContext';
 import { validateAction, shapeId as normalizeId } from '../lib/ai/actions';
 import { extractShapeSemanticText } from '../lib/spatialVision';
+import {
+  assertSpatialSourceContract,
+  mergeDeckSlidesPreservingUnknownFields,
+} from '../lib/spatialSourceContract';
+import { runEditorOperationSafely } from '../lib/editorOperation';
+import {
+  assertCanvasWritable,
+  assertSpatialActionsWritable,
+  isSpatialCanvasMutation,
+  READONLY_CANVAS_MESSAGE,
+} from '../lib/canvasWriteGuard';
+
+function solvedActionHasCanvasWrites(payload: SolvedActionPayload): boolean {
+  return Boolean(
+    isSpatialCanvasMutation(payload.rawFrame) ||
+      payload.nodes?.length ||
+      payload.createdCard ||
+      payload.richCard ||
+      payload.codeCard ||
+      payload.artifact ||
+      payload.mediaEmbed ||
+      payload.vector ||
+      payload.document ||
+      payload.deck ||
+      payload.connector ||
+      payload.group ||
+      payload.textMutation ||
+      payload.restyle ||
+      payload.deletedIds?.length
+  );
+}
+
+function solvedLayoutHasCanvasWrites(result: SolvedLayoutResult): boolean {
+  return Boolean(
+    result.actions?.some(solvedActionHasCanvasWrites) ||
+      result.nodes.length ||
+      result.createdCards?.length ||
+      result.richCards?.length ||
+      result.codeCards?.length ||
+      result.artifacts?.length ||
+      result.mediaEmbeds?.length ||
+      result.vectors?.length ||
+      result.documents?.length ||
+      result.decks?.length ||
+      result.groups?.length ||
+      result.connectors?.length ||
+      result.textMutations?.length ||
+      result.restyles?.length ||
+      result.deletedIds?.length
+  );
+}
 
 export interface SpatialWorkerState {
   isWorkerReady: boolean;
@@ -56,14 +122,32 @@ export function useSpatialWorker(editor: Editor | null) {
         resolve: () => void;
         reject: (e: Error) => void;
         timer: ReturnType<typeof setTimeout>;
-        originals: Map<string, string>;
+        snapshot: SpatialPageSnapshot;
+        validateBeforeApply: () => void;
       }
     >()
   );
+  const directLayoutSnapshotsRef = useRef(new Map<string, SpatialPageSnapshot>());
+  const contextSerializationCacheRef = useRef<SpatialSerializationCache>(
+    createSpatialSerializationCache()
+  );
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
+  const streamPageSnapshotRef = useRef<SpatialPageSnapshot | null>(null);
+  const streamSourceNodesRef = useRef<SpatialNodeItem[]>([]);
   const streamStartTimeRef = useRef<number>(0);
   const firstTokenReceivedRef = useRef<boolean>(false);
+  const indexedPageIdRef = useRef<string | null>(null);
+  const indexRevisionRef = useRef(0);
+  const indexedStoreVersionRef = useRef(0);
+  const observedStoreVersionRef = useRef(0);
+  const indexedNodesRef = useRef(new Map<string, SpatialNodeItem>());
+  const shapePropsRef = useRef(new Map<string, unknown>());
+  const parentIdsRef = useRef(new Map<string, string>());
+  const childrenByParentRef = useRef(new Map<string, Set<string>>());
+  const queuedIndexChangesRef = useRef(new Map<string, 'upsert' | 'delete'>());
+  const indexOrderDirtyRef = useRef(false);
+  const indexSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [state, setState] = useState<SpatialWorkerState>({
     isWorkerReady: false,
@@ -79,19 +163,28 @@ export function useSpatialWorker(editor: Editor | null) {
     skeletons: [],
   });
 
+  const reportReadonlyWrite = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      lastActionSummary: READONLY_CANVAS_MESSAGE,
+      skeletons: [],
+    }));
+  }, []);
+
   // Extract spatial nodes from tldraw editor
   const extractSpatialNodes = useCallback((): SpatialNodeItem[] => {
     if (!editor) return [];
-    return serializeCanvas(editor);
+    return serializeCanvas(editor, contextSerializationCacheRef.current);
   }, [editor]);
 
   // Spring animation runner for smooth 60 FPS transitions
   const animateShapesToTargets = useCallback(
     (solvedNodes: SolvedNodeCoordinate[]) => {
       if (!editor || solvedNodes.length === 0) return;
+      assertCanvasWritable(editor);
 
       // Commit once: animated document writes polluted undo and raced manual drags.
-      editor.updateShapes(
+      runEditorOperationSafely(editor, () => editor.updateShapes(
         solvedNodes.flatMap((target) => {
           const shape = editor.getShape(target.id as TLShapeId);
           if (!shape) return [];
@@ -116,7 +209,7 @@ export function useSpatialWorker(editor: Editor | null) {
             } as TLShapePartial,
           ];
         })
-      );
+      ));
     },
     [editor]
   );
@@ -124,12 +217,13 @@ export function useSpatialWorker(editor: Editor | null) {
   // Creates or updates a card on canvas
   const applyCreatedCard = useCallback(
     (card: SolvedCreatedCard) => {
-      if (!editor) return;
+      if (!editor) throw new Error('The canvas is not ready to create this card. Retry.');
+      assertCanvasWritable(editor);
       const shapeId = (
         card.id.startsWith('shape:') ? card.id : `shape:${card.id}`
       ) as TLShapeId;
 
-      editor.run(() => {
+      runEditorOperationSafely(editor, () => {
         const isNote = card.shapeType === 'note';
         const existing = editor.getShape(shapeId);
         const richText = toRichText(
@@ -189,73 +283,52 @@ export function useSpatialWorker(editor: Editor | null) {
   const applyRichCard = useCallback(
     (card: SolvedRichCardItem) => {
       if (!editor) {
-        console.error(
-          '[applyRichCard] ❌ editor is null, card:',
-          card.id,
-          card.title
-        );
-        return;
+        throw new Error('The canvas is not ready to apply this note. Retry.');
       }
+      assertCanvasWritable(editor);
       const shapeId = (
         card.id.startsWith('shape:') ? card.id : `shape:${card.id}`
       ) as TLShapeId;
-      console.log(
-        `[applyRichCard] 🎯 Applying card "${card.title}" id=${shapeId} at (${card.x}, ${card.y}) size=${card.w}x${card.h}`
-      );
 
-      try {
-        editor.run(() => {
-          const existing = editor.getShape(shapeId);
-          if (existing) {
-            console.log(
-              `[applyRichCard] ♻️ Updating existing shape ${shapeId}`
-            );
-            editor.updateShape({
-              id: shapeId,
-              type: 'rich_card',
-              x: existing.x,
-              y: existing.y,
-              props: {
-                w: card.w,
-                h: card.h,
-                title: card.title,
-                content: card.content,
-                archetype: card.archetype || 'note',
-                color: card.color || 'light-blue',
-                isStreaming: card.isStreaming || false,
-              },
-            });
-          } else {
-            console.log(`[applyRichCard] ✨ Creating NEW shape ${shapeId}`);
-            editor.createShape({
-              id: shapeId,
-              type: 'rich_card',
-              x: card.x,
-              y: card.y,
-              props: {
-                w: card.w,
-                h: card.h,
-                title: card.title,
-                content: card.content,
-                archetype: card.archetype || 'note',
-                color: card.color || 'light-blue',
-                isStreaming: card.isStreaming || false,
-              },
-            });
-          }
-        });
+      runEditorOperationSafely(editor, () => {
+        const existing = editor.getShape(shapeId);
+        if (existing) {
+          editor.updateShape({
+            id: shapeId,
+            type: 'rich_card',
+            x: existing.x,
+            y: existing.y,
+            props: {
+              w: card.w,
+              h: card.h,
+              title: card.title,
+              content: card.content,
+              archetype: card.archetype || 'note',
+              color: card.color || 'light-blue',
+              isStreaming: card.isStreaming || false,
+            },
+          });
+        } else {
+          editor.createShape({
+            id: shapeId,
+            type: 'rich_card',
+            x: card.x,
+            y: card.y,
+            props: {
+              w: card.w,
+              h: card.h,
+              title: card.title,
+              content: card.content,
+              archetype: card.archetype || 'note',
+              color: card.color || 'light-blue',
+              isStreaming: card.isStreaming || false,
+            },
+          });
+        }
+      });
 
-        // Verify shape actually exists after creation
-        const verifyShape = editor.getShape(shapeId);
-        console.log(
-          `[applyRichCard] ✅ Post-create verify: shape exists = ${!!verifyShape}, id = ${shapeId}`
-        );
-      } catch (err) {
-        console.error(
-          `[applyRichCard] 💥 Error creating shape ${shapeId}:`,
-          err
-        );
-      }
+      if (!editor.getShape(shapeId))
+        throw new Error(`Could not apply note “${card.title}”. Retry.`);
 
       // Dismiss matching speculative skeleton
       setState((prev) => ({
@@ -269,12 +342,13 @@ export function useSpatialWorker(editor: Editor | null) {
   // Creates or updates a syntax-highlighted code card
   const applyCodeCard = useCallback(
     (card: SolvedCodeCardItem) => {
-      if (!editor) return;
+      if (!editor) throw new Error('The canvas is not ready to apply this code card. Retry.');
+      assertCanvasWritable(editor);
       const shapeId = (
         card.id.startsWith('shape:') ? card.id : `shape:${card.id}`
       ) as TLShapeId;
 
-      editor.run(() => {
+      runEditorOperationSafely(editor, () => {
         const existing = editor.getShape(shapeId);
         if (existing) {
           editor.updateShape({
@@ -334,6 +408,7 @@ export function useSpatialWorker(editor: Editor | null) {
   const patchRichCardContent = useCallback(
     (cardId: string, appendText: string, isStreaming = true) => {
       if (!editor) return;
+      assertCanvasWritable(editor);
       const shapeId = (
         cardId.startsWith('shape:') ? cardId : `shape:${cardId}`
       ) as TLShapeId;
@@ -358,12 +433,13 @@ export function useSpatialWorker(editor: Editor | null) {
   // Creates or updates an interactive sandbox simulation artifact
   const applyArtifact = useCallback(
     (artifact: SolvedArtifactItem) => {
-      if (!editor) return;
+      if (!editor) throw new Error('The canvas is not ready to apply this app. Retry.');
+      assertCanvasWritable(editor);
       const shapeId = (
         artifact.id.startsWith('shape:') ? artifact.id : `shape:${artifact.id}`
       ) as TLShapeId;
 
-      editor.run(() => {
+      runEditorOperationSafely(editor, () => {
         const existing = editor.getShape(shapeId);
         if (existing) {
           const prevProps = existing.props as Record<string, any>;
@@ -377,6 +453,9 @@ export function useSpatialWorker(editor: Editor | null) {
               h: artifact.h || prevProps.h,
               title: artifact.title || prevProps.title,
               code: artifact.code || prevProps.code,
+              ...(artifact.code !== undefined && artifact.code !== prevProps.code
+                ? { networkEnabled: false }
+                : {}),
               color: artifact.color || prevProps.color || 'light-violet',
               storage:
                 artifact.storage && Object.keys(artifact.storage).length > 0
@@ -419,12 +498,13 @@ export function useSpatialWorker(editor: Editor | null) {
   // Creates or updates a media embed player (YouTube, Web, Audio)
   const applyMediaEmbed = useCallback(
     (media: SolvedMediaEmbedItem) => {
-      if (!editor) return;
+      if (!editor) throw new Error('The canvas is not ready to apply this media. Retry.');
+      assertCanvasWritable(editor);
       const shapeId = (
         media.id.startsWith('shape:') ? media.id : `shape:${media.id}`
       ) as TLShapeId;
 
-      editor.run(() => {
+      runEditorOperationSafely(editor, () => {
         const existing = editor.getShape(shapeId);
         if (existing) {
           editor.updateShape({
@@ -470,12 +550,13 @@ export function useSpatialWorker(editor: Editor | null) {
   // Creates or updates an architectural glyph or procedural SVG vector shape
   const applyVectorShape = useCallback(
     (vector: SolvedVectorItem) => {
-      if (!editor) return;
+      if (!editor) throw new Error('The canvas is not ready to apply this vector. Retry.');
+      assertCanvasWritable(editor);
       const shapeId = (
         vector.id.startsWith('shape:') ? vector.id : `shape:${vector.id}`
       ) as TLShapeId;
 
-      editor.run(() => {
+      runEditorOperationSafely(editor, () => {
         const existing = editor.getShape(shapeId);
         if (existing) {
           editor.updateShape({
@@ -523,12 +604,13 @@ export function useSpatialWorker(editor: Editor | null) {
   // Creates or updates a longform document shape (Notion grade)
   const applyDocument = useCallback(
     (doc: SolvedDocItem) => {
-      if (!editor) return;
+      if (!editor) throw new Error('The canvas is not ready to apply this document. Retry.');
+      assertCanvasWritable(editor);
       const shapeId = (
         doc.id.startsWith('shape:') ? doc.id : `shape:${doc.id}`
       ) as TLShapeId;
 
-      editor.run(() => {
+      runEditorOperationSafely(editor, () => {
         const existing = editor.getShape(shapeId);
         if (existing) {
           editor.updateShape({
@@ -573,10 +655,72 @@ export function useSpatialWorker(editor: Editor | null) {
     [editor]
   );
 
+  const applyDeck = useCallback(
+    (deck: SolvedDeckItem, rawFrame: SpatialActionFrame) => {
+      if (!editor) throw new Error('The canvas is not ready to apply this deck. Retry.');
+      assertCanvasWritable(editor);
+      validateAction(rawFrame);
+      const isCreate = rawFrame.op === 'create_slide_deck';
+      if (!isCreate && rawFrame.op !== 'mutate_slide_deck')
+        throw new Error('Invalid slide deck action.');
+      const requestedId = isCreate ? rawFrame.id : rawFrame.target || rawFrame.id;
+      if (!requestedId || normalizeId(requestedId) !== normalizeId(deck.id))
+        throw new Error('Slide deck action target changed before apply. Retry.');
+      const id = normalizeId(deck.id) as TLShapeId;
+      const existing = editor.getShape(id);
+      if (isCreate && existing)
+        throw new Error('The new slide deck ID already exists. Retry.');
+      if (!isCreate && (!existing || existing.type !== 'slide_deck'))
+        throw new Error('The slide deck no longer exists. Retry with the latest canvas.');
+      if (existing && isCanvasShapeLocked(editor, existing))
+        throw new Error('Unlock the slide deck and its frame before asking AI to change it.');
+
+      const currentProps = existing?.props as Record<string, unknown> | undefined;
+      const slides = mergeDeckSlidesPreservingUnknownFields(
+        Array.isArray(currentProps?.slides) ? currentProps.slides : [],
+        deck.slides
+      );
+      const props = {
+        ...(isCreate ? { w: deck.w, h: deck.h } : {}),
+        title: deck.title,
+        subtitle: deck.subtitle,
+        theme: deck.theme || 'midnight',
+        currentSlideIndex: deck.currentSlideIndex ?? 0,
+        slides,
+      };
+
+      runEditorOperationSafely(editor, () => {
+        if (existing) {
+          editor.updateShape({ id, type: 'slide_deck', x: existing.x, y: existing.y, props });
+        } else {
+          editor.createShape({ id, type: 'slide_deck', x: deck.x, y: deck.y, props });
+        }
+      });
+
+      const readback = editor.getShape(id);
+      const savedProps = readback?.props as Record<string, unknown> | undefined;
+      if (
+        readback?.type !== 'slide_deck' ||
+        savedProps?.title !== props.title ||
+        savedProps?.subtitle !== props.subtitle ||
+        savedProps?.theme !== props.theme ||
+        savedProps?.currentSlideIndex !== props.currentSlideIndex ||
+        JSON.stringify(savedProps?.slides) !== JSON.stringify(props.slides)
+      )
+        throw new Error('The slide deck did not verify after writing. No success was reported.');
+      setState((prev) => ({
+        ...prev,
+        skeletons: prev.skeletons.filter((item) => normalizeId(item.id) !== id),
+      }));
+    },
+    [editor]
+  );
+
   // Creates or updates a group container visual bounding frame
   const applyGroupFrame = useCallback(
     (group: SolvedGroupItem) => {
-      if (!editor) return;
+      if (!editor) throw new Error('The canvas is not ready to apply this group. Retry.');
+      assertCanvasWritable(editor);
 
       const placeGroup = () => {
         const shapeId = (
@@ -590,6 +734,11 @@ export function useSpatialWorker(editor: Editor | null) {
             (id) => id !== shapeId && editor.getShape(id)?.type !== 'arrow'
           );
         }
+
+        const existingGroup = editor.getShape(shapeId);
+        if (existingGroup && isCanvasShapeLocked(editor, existingGroup))
+          throw new Error('Unlock the group frame before changing its membership.');
+        assertShapesUnlockedForReparent(editor, targetNodeIds);
 
         let finalX = group.x;
         let finalY = group.y;
@@ -624,7 +773,7 @@ export function useSpatialWorker(editor: Editor | null) {
           }
         }
 
-        editor.run(() => {
+        runEditorOperationSafely(editor, () => {
           if (!editor.getShape(shapeId))
             editor.createShape({
               id: shapeId,
@@ -648,7 +797,8 @@ export function useSpatialWorker(editor: Editor | null) {
   // Creates a directional connector arrow between two shapes with magnetic dynamic edge bindings
   const applyConnector = useCallback(
     (connector: SolvedConnectorItem) => {
-      if (!editor) return;
+      if (!editor) throw new Error('The canvas is not ready to apply this connector. Retry.');
+      assertCanvasWritable(editor);
 
       const connect = () => {
         const fromShapeId = (
@@ -665,12 +815,14 @@ export function useSpatialWorker(editor: Editor | null) {
         const fromShape = editor.getShape(fromShapeId);
         const toShape = editor.getShape(toShapeId);
 
-        if (!fromShape || !toShape) return false;
+        if (!fromShape || !toShape)
+          throw new Error('Connector targets no longer exist. Retry with the current canvas.');
 
         const fromBounds = editor.getShapePageBounds(fromShapeId);
         const toBounds = editor.getShapePageBounds(toShapeId);
 
-        if (!fromBounds || !toBounds) return false;
+        if (!fromBounds || !toBounds)
+          throw new Error('Connector targets are not available on the current page.');
 
         const fromCenter = {
           x: fromBounds.minX + fromBounds.w / 2,
@@ -727,7 +879,7 @@ export function useSpatialWorker(editor: Editor | null) {
             : `shape:${connector.id}`
         ) as TLShapeId;
 
-        editor.run(() => {
+        runEditorOperationSafely(editor, () => {
           const existing = editor.getShape(arrowId);
           if (existing) {
             editor.updateShape({
@@ -803,16 +955,17 @@ export function useSpatialWorker(editor: Editor | null) {
   // Restyles shape color / fill in-place
   const applyRestyle = useCallback(
     (restyle: SolvedRestyle) => {
-      if (!editor) return;
+      if (!editor) throw new Error('The canvas is not ready to apply this style. Retry.');
+      assertCanvasWritable(editor);
       const shapeId = (
         restyle.id.startsWith('shape:') ? restyle.id : `shape:${restyle.id}`
       ) as TLShapeId;
       const shape = editor.getShape(shapeId);
-      if (!shape) return;
+      if (!shape) throw new Error('The style target no longer exists. Retry with the current canvas.');
 
       if (restyle.color && !('color' in shape.props))
         throw new Error('This shape does not support a color style.');
-      editor.run(() => {
+      runEditorOperationSafely(editor, () => {
         editor.updateShape({
           id: shapeId,
           type: shape.type,
@@ -831,11 +984,15 @@ export function useSpatialWorker(editor: Editor | null) {
   // Deletes shapes from canvas
   const applyDelete = useCallback(
     (ids: string[]) => {
-      if (!editor || ids.length === 0) return;
+      if (!editor) throw new Error('The canvas is not ready to delete these objects. Retry.');
+      if (ids.length === 0) return;
+      assertCanvasWritable(editor);
       const shapeIds = ids.map(
         (id) => (id.startsWith('shape:') ? id : `shape:${id}`) as TLShapeId
       );
-      editor.deleteShapes(shapeIds);
+      if (shapeIds.some((id) => !editor.getShape(id)))
+        throw new Error('A delete target no longer exists. Retry with the current canvas.');
+      runEditorOperationSafely(editor, () => editor.deleteShapes(shapeIds));
     },
     [editor]
   );
@@ -843,14 +1000,15 @@ export function useSpatialWorker(editor: Editor | null) {
   // Updates shape text / markdown content in-place
   const applyTextMutation = useCallback(
     (mutation: SolvedTextMutation) => {
-      if (!editor) return;
+      if (!editor) throw new Error('The canvas is not ready to apply this text change. Retry.');
+      assertCanvasWritable(editor);
       const shapeId = (
         mutation.id.startsWith('shape:') ? mutation.id : `shape:${mutation.id}`
       ) as TLShapeId;
       const shape = editor.getShape(shapeId);
-      if (!shape) return;
+      if (!shape) throw new Error('The text target no longer exists. Retry with the current canvas.');
 
-      editor.run(() => {
+      runEditorOperationSafely(editor, () => {
         if (shape.type === 'rich_card') {
           editor.updateShape({
             id: shapeId,
@@ -870,17 +1028,13 @@ export function useSpatialWorker(editor: Editor | null) {
             },
           });
         } else if (shape.type === 'artifact') {
-          // If mutation text contains html/canvas/script, update code, else update title
-          const isCode =
-            mutation.text.includes('<canvas') ||
-            mutation.text.includes('<script') ||
-            mutation.text.includes('function') ||
-            mutation.text.includes('const ');
+          // App source is changed only through mutate_artifact, which validates
+          // complete HTML before the transaction reaches this handler.
           editor.updateShape({
             id: shapeId,
             type: 'artifact',
             props: {
-              ...(isCode ? { code: mutation.text } : { title: mutation.text }),
+              title: mutation.text,
               ...(mutation.color ? { color: mutation.color } : {}),
             },
           });
@@ -902,6 +1056,9 @@ export function useSpatialWorker(editor: Editor | null) {
   // Dispatches solved SAP frame to canvas
   const handleSolvedAction = useCallback(
     (payload: SolvedActionPayload) => {
+      if (editor && solvedActionHasCanvasWrites(payload)) {
+        assertCanvasWritable(editor);
+      }
       if (!firstTokenReceivedRef.current) {
         firstTokenReceivedRef.current = true;
         const firstTokenLatency = Number(
@@ -972,6 +1129,10 @@ export function useSpatialWorker(editor: Editor | null) {
         applyDocument(payload.document);
       }
 
+      if (payload.deck) {
+        applyDeck(payload.deck, payload.rawFrame);
+      }
+
       // 4. Handle Constraint Coordinates & Spring Relaxation
       if (payload.nodes && payload.nodes.length > 0) {
         animateShapesToTargets(payload.nodes);
@@ -998,10 +1159,12 @@ export function useSpatialWorker(editor: Editor | null) {
       }
 
       if (payload.focusIds?.length && editor) {
-        editor.setSelectedShapes(
-          payload.focusIds.map((id) => normalizeId(id) as TLShapeId)
-        );
-        editor.zoomToSelection();
+        runEditorOperationSafely(editor, () => {
+          editor.setSelectedShapes(
+            payload.focusIds!.map((id) => normalizeId(id) as TLShapeId)
+          );
+          editor.zoomToSelection();
+        });
       }
       // 9. Handle Deletions
       if (payload.deletedIds && payload.deletedIds.length > 0) {
@@ -1022,19 +1185,193 @@ export function useSpatialWorker(editor: Editor | null) {
       applyRestyle,
       applyDelete,
       applyDocument,
+      applyDeck,
       editor,
     ]
   );
 
-  // Sync editor shapes with Worker R-Tree index
-  const syncShapesWithWorker = useCallback(() => {
+  const rebuildSpatialParentIndex = useCallback(() => {
+    if (!editor) return;
+    parentIdsRef.current.clear();
+    childrenByParentRef.current.clear();
+    for (const shape of editor.getCurrentPageShapes()) {
+      const parentId = shape.parentId as string;
+      parentIdsRef.current.set(shape.id as string, parentId);
+      const children = childrenByParentRef.current.get(parentId) || new Set<string>();
+      children.add(shape.id as string);
+      childrenByParentRef.current.set(parentId, children);
+    }
+  }, [editor]);
+
+  const collectSpatialDescendants = useCallback((rootId: string) => {
+    const descendants = new Set<string>();
+    const pending = [...(childrenByParentRef.current.get(rootId) || [])];
+    while (pending.length) {
+      const childId = pending.pop()!;
+      if (descendants.has(childId)) continue;
+      descendants.add(childId);
+      pending.push(...(childrenByParentRef.current.get(childId) || []));
+    }
+    return descendants;
+  }, []);
+
+  const replaceSpatialIndex = useCallback(() => {
     if (!workerRef.current || !editor) return;
+    if (indexSyncTimerRef.current) clearTimeout(indexSyncTimerRef.current);
+    indexSyncTimerRef.current = null;
+    queuedIndexChangesRef.current.clear();
+    indexOrderDirtyRef.current = false;
+
+    const pageId = editor.getCurrentPageId() as string;
     const nodes = extractSpatialNodes();
+    const shapes = editor.getCurrentPageShapesSorted();
+    indexedNodesRef.current = new Map(nodes.map((node) => [node.id, node]));
+    shapePropsRef.current = new Map(
+      shapes.map((shape) => [shape.id as string, shape.props])
+    );
+    rebuildSpatialParentIndex();
+    indexedPageIdRef.current = pageId;
+    const storeVersion = editor.store.history.get();
+    indexedStoreVersionRef.current = storeVersion;
+    observedStoreVersionRef.current = storeVersion;
+    const revision = ++indexRevisionRef.current;
     workerRef.current.postMessage({
       type: 'SYNC_INDEX',
+      pageId,
+      revision,
       nodes,
     } satisfies WorkerInMessage);
-  }, [editor, extractSpatialNodes]);
+  }, [editor, extractSpatialNodes, rebuildSpatialParentIndex]);
+
+  const isShapeOnCurrentPage = useCallback((shape: ReturnType<Editor['getShape']>) => {
+    if (!editor || !shape) return false;
+    let parentId = shape.parentId as string;
+    const visited = new Set<string>();
+    while (parentId.startsWith('shape:')) {
+      if (visited.has(parentId)) return false;
+      visited.add(parentId);
+      const parent = editor.getShape(parentId as TLShapeId);
+      if (!parent) return false;
+      parentId = parent.parentId as string;
+    }
+    return parentId === editor.getCurrentPageId();
+  }, [editor]);
+
+  const flushSpatialIndexChanges = useCallback(() => {
+    if (!workerRef.current || !editor) return;
+    if (indexedPageIdRef.current !== editor.getCurrentPageId()) {
+      replaceSpatialIndex();
+      return;
+    }
+
+    const changes = queuedIndexChangesRef.current;
+    const orderDirty = indexOrderDirtyRef.current;
+    if (!changes.size && !orderDirty) return;
+    queuedIndexChangesRef.current = new Map();
+    indexOrderDirtyRef.current = false;
+
+    const nodes: Array<SpatialNodeItem | ReturnType<typeof spatialNodeGeometryPatch>> = [];
+    const deletedIds = new Set<string>();
+    if (orderDirty) {
+      const currentShapes = editor.getCurrentPageShapesSorted();
+      const currentIds = new Set(currentShapes.map((shape) => shape.id as string));
+      for (const id of indexedNodesRef.current.keys()) {
+        if (!currentIds.has(id)) deletedIds.add(id);
+      }
+      currentShapes.forEach((shape, zIndex) => {
+        const id = shape.id as string;
+        const previous = indexedNodesRef.current.get(id);
+        const canReuseSource =
+          previous &&
+          previous.type === shape.type &&
+          shapePropsRef.current.get(id) === shape.props;
+        const node = serializeSpatialShape(
+          editor,
+          shape,
+          zIndex,
+          canReuseSource ? previous : undefined
+        );
+        if (node) {
+          nodes.push(canReuseSource ? spatialNodeGeometryPatch(node) : node);
+          indexedNodesRef.current.set(id, node);
+        } else if (indexedNodesRef.current.delete(id)) {
+          deletedIds.add(id);
+        }
+        shapePropsRef.current.set(id, shape.props);
+      });
+      for (const id of deletedIds) {
+        indexedNodesRef.current.delete(id);
+        shapePropsRef.current.delete(id);
+      }
+    } else {
+      for (const [id, operation] of changes) {
+        const shape = editor.getShape(id as TLShapeId);
+        if (operation === 'delete' || !shape || !isShapeOnCurrentPage(shape)) {
+          if (indexedNodesRef.current.delete(id)) deletedIds.add(id);
+          shapePropsRef.current.delete(id);
+          continue;
+        }
+
+        const previous = indexedNodesRef.current.get(id);
+        const canReuseSource =
+          previous &&
+          previous.type === shape.type &&
+          shapePropsRef.current.get(id) === shape.props;
+        const node = serializeSpatialShape(
+          editor,
+          shape,
+          previous?.zIndex ?? 0,
+          canReuseSource ? previous : undefined
+        );
+        if (!node) {
+          if (indexedNodesRef.current.delete(id)) deletedIds.add(id);
+          shapePropsRef.current.delete(id);
+          continue;
+        }
+        nodes.push(canReuseSource ? spatialNodeGeometryPatch(node) : node);
+        indexedNodesRef.current.set(id, node);
+        shapePropsRef.current.set(id, shape.props);
+      }
+    }
+
+    const storeVersion = editor.store.history.get();
+    if (!nodes.length && !deletedIds.size) {
+      indexedStoreVersionRef.current = storeVersion;
+      return;
+    }
+    const pageId = editor.getCurrentPageId() as string;
+    const revision = ++indexRevisionRef.current;
+    indexedStoreVersionRef.current = storeVersion;
+    workerRef.current.postMessage({
+      type: 'PATCH_INDEX',
+      pageId,
+      revision,
+      nodes,
+      deletedIds: [...deletedIds],
+    } satisfies WorkerInMessage);
+  }, [editor, isShapeOnCurrentPage, replaceSpatialIndex]);
+
+  const scheduleSpatialIndexFlush = useCallback(() => {
+    if (indexSyncTimerRef.current) clearTimeout(indexSyncTimerRef.current);
+    indexSyncTimerRef.current = setTimeout(() => {
+      indexSyncTimerRef.current = null;
+      flushSpatialIndexChanges();
+    }, 60);
+  }, [flushSpatialIndexChanges]);
+
+  // Explicit worker operations synchronously flush only pending shape deltas.
+  const syncShapesWithWorker = useCallback(() => {
+    if (!workerRef.current || !editor) return;
+    if (indexSyncTimerRef.current) clearTimeout(indexSyncTimerRef.current);
+    indexSyncTimerRef.current = null;
+    if (observedStoreVersionRef.current < editor.store.history.get()) {
+      // A store change has committed but its throttled listener has not run yet.
+      // Snapshot now so an immediate operation cannot solve against stale source.
+      replaceSpatialIndex();
+      return;
+    }
+    flushSpatialIndexChanges();
+  }, [editor, flushSpatialIndexChanges, replaceSpatialIndex]);
 
   // Initialize Worker
   useEffect(() => {
@@ -1058,6 +1395,16 @@ export function useSpatialWorker(editor: Editor | null) {
           }));
           break;
 
+        case 'INDEX_PATCHED':
+          setState((prev) => ({ ...prev, indexedCount: msg.count }));
+          break;
+
+        case 'INDEX_RESYNC_REQUIRED':
+          if (editor && msg.pageId === editor.getCurrentPageId()) {
+            replaceSpatialIndex();
+          }
+          break;
+
         case 'DAG_PLAN_SOLVED':
           setState((prev) => ({
             ...prev,
@@ -1067,10 +1414,124 @@ export function useSpatialWorker(editor: Editor | null) {
           break;
 
         case 'STREAM_ACTION_SOLVED':
-          handleSolvedAction(msg.payload);
+          if (activeSessionIdRef.current !== msg.sessionId) {
+            // A cancelled/replaced stream may have solved its last chunk
+            // before the abort reached the worker. Ignore its output and reset
+            // any speculative index changes it made.
+            worker.postMessage({
+              type: 'STREAM_ABORT',
+              sessionId: msg.sessionId,
+            } satisfies WorkerInMessage);
+            replaceSpatialIndex();
+            break;
+          }
+          if (
+            !editor ||
+            !streamPageSnapshotRef.current ||
+            !matchesSpatialPageSnapshot(editor, streamPageSnapshotRef.current)
+          ) {
+            worker.postMessage({
+              type: 'STREAM_ABORT',
+              sessionId: msg.sessionId,
+            } satisfies WorkerInMessage);
+            abortControllerRef.current?.abort();
+            abortControllerRef.current = null;
+            activeSessionIdRef.current = null;
+            streamPageSnapshotRef.current = null;
+            streamSourceNodesRef.current = [];
+            if (editor) replaceSpatialIndex();
+            setState((prev) => ({
+              ...prev,
+              isStreaming: false,
+              streamingAction: null,
+              lastActionSummary: 'The canvas changed while the AI action was being prepared. Please retry.',
+              skeletons: [],
+            }));
+            break;
+          }
+          let streamFrameMark: string | undefined;
+          const streamRollbackStatus = { attempted: false, error: undefined as unknown };
+          try {
+            streamFrameMark = editor.markHistoryStoppingPoint(
+              'ai_stream_frame_start'
+            );
+            if (msg.payload.rawFrame) {
+              assertSpatialSourceContract(
+                [msg.payload.rawFrame],
+                streamSourceNodesRef.current,
+                (id) => {
+                  const shape = editor.getShape(normalizeId(id) as TLShapeId);
+                  return shape
+                    ? { type: shape.type, props: shape.props as Record<string, unknown> }
+                    : undefined;
+                }
+              );
+            }
+            runEditorOperationSafely(
+              editor,
+              () => handleSolvedAction(msg.payload),
+              streamFrameMark,
+              streamRollbackStatus
+            );
+            if (msg.payload.rawFrame) {
+              const changedIds = [
+                msg.payload.rawFrame.id,
+                msg.payload.rawFrame.target,
+              ].filter((id): id is string => Boolean(id));
+              if (changedIds.length) {
+                const currentNodes = serializeCanvas(editor);
+                for (const changedId of changedIds) {
+                  const currentNode = currentNodes.find(
+                    (node) => normalizeId(node.id) === normalizeId(changedId)
+                  );
+                  if (!currentNode) continue;
+                  streamSourceNodesRef.current = [
+                    ...streamSourceNodesRef.current.filter(
+                      (node) => normalizeId(node.id) !== normalizeId(currentNode.id)
+                    ),
+                    currentNode,
+                  ];
+                }
+              }
+            }
+            editor.markHistoryStoppingPoint('ai_stream_frame_end');
+            streamPageSnapshotRef.current = captureSpatialPageSnapshot(editor);
+          } catch (error) {
+            let rollbackError = streamRollbackStatus.error;
+            if (streamFrameMark && editor && !streamRollbackStatus.attempted) {
+              try {
+                editor.bailToMark(streamFrameMark);
+              } catch (failure) {
+                rollbackError = failure;
+              }
+            }
+            worker.postMessage({
+              type: 'STREAM_ABORT',
+              sessionId: msg.sessionId,
+            } satisfies WorkerInMessage);
+            activeSessionIdRef.current = null;
+            streamPageSnapshotRef.current = null;
+            streamSourceNodesRef.current = [];
+            replaceSpatialIndex();
+            const applyMessage =
+              error instanceof Error ? error.message : String(error);
+            const rollbackMessage = rollbackError
+              ? ` Automatic rollback also failed: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}. The canvas may contain partial changes; inspect it before retrying.`
+              : streamFrameMark
+                ? ' The streamed change was rolled back.'
+                : ' No rollback checkpoint was available; inspect the canvas for partial changes.';
+            setState((prev) => ({
+              ...prev,
+              isStreaming: false,
+              streamingAction: null,
+              lastActionSummary: `Could not apply the canvas change: ${applyMessage}.${rollbackMessage}`,
+              skeletons: [],
+            }));
+          }
           break;
 
         case 'STREAM_COMPLETE':
+          if (activeSessionIdRef.current !== msg.sessionId) break;
           setState((prev) => ({
             ...prev,
             isStreaming: false,
@@ -1080,10 +1541,13 @@ export function useSpatialWorker(editor: Editor | null) {
             skeletons: [], // clear remaining skeletons
           }));
           activeSessionIdRef.current = null;
+          streamPageSnapshotRef.current = null;
+          streamSourceNodesRef.current = [];
           break;
 
         case 'STREAM_ERROR':
-          console.error('[Worker Stream Error]', msg.error);
+          if (activeSessionIdRef.current !== msg.sessionId) break;
+          console.error('[Worker Stream Error] Stream processing failed.');
           setState((prev) => ({
             ...prev,
             isStreaming: false,
@@ -1092,31 +1556,71 @@ export function useSpatialWorker(editor: Editor | null) {
             skeletons: [],
           }));
           activeSessionIdRef.current = null;
+          streamPageSnapshotRef.current = null;
+          streamSourceNodesRef.current = [];
           break;
 
         case 'LAYOUT_SOLVED': {
           const pending = msg.requestId
             ? pendingRef.current.get(msg.requestId)
             : undefined;
-          if (msg.requestId && !pending) break; // cancelled or timed-out request
+          const directSnapshot = msg.requestId
+            ? directLayoutSnapshotsRef.current.get(msg.requestId)
+            : undefined;
+          if (msg.requestId && !pending && !directSnapshot) {
+            // An aborted or timed-out request can still finish in the worker.
+            // Its result is intentionally ignored, so discard its speculative
+            // worker-side state as well.
+            replaceSpatialIndex();
+            break;
+          }
           if (pending && editor) {
-            for (const [id, original] of pending.originals) {
-              if (
-                JSON.stringify(editor.getShape(id as TLShapeId)) !== original
-              ) {
-                clearTimeout(pending.timer);
-                pendingRef.current.delete(msg.requestId!);
-                pending.reject(
-                  new Error(
-                    'Canvas changed while applying the action. Please retry.'
-                  )
-                );
-                return;
-              }
+            try {
+              assertSpatialPageSnapshotCurrent(editor, pending.snapshot);
+            } catch (error) {
+              clearTimeout(pending.timer);
+              pendingRef.current.delete(msg.requestId!);
+              // The worker has already solved this batch and advanced its
+              // private spatial index. The rejected result must not remain as
+              // the basis for a later action.
+              replaceSpatialIndex();
+              pending.reject(
+                error instanceof Error ? error : new Error(String(error))
+              );
+              return;
             }
           }
-          const mark = editor?.markHistoryStoppingPoint('ai_batch_start');
+          if (directSnapshot && editor) {
+            directLayoutSnapshotsRef.current.delete(msg.requestId!);
+            try {
+              assertSpatialPageSnapshotCurrent(editor, directSnapshot);
+            } catch (error) {
+              // Direct layout solvers can update their private index too.
+              replaceSpatialIndex();
+              setState((prev) => ({
+                ...prev,
+                lastActionSummary: `${error instanceof Error ? error.message : String(error)} The layout was not applied.`,
+              }));
+              return;
+            }
+          }
+          let mark: string | undefined;
+          const batchRollbackStatus = { attempted: false, error: undefined as unknown };
           try {
+            if (editor && msg.result.actions) {
+              assertSpatialActionsWritable(
+                editor,
+                msg.result.actions.map((action) => action.rawFrame)
+              );
+            } else if (editor && solvedLayoutHasCanvasWrites(msg.result)) {
+              assertCanvasWritable(editor);
+            }
+            mark = editor?.markHistoryStoppingPoint('ai_batch_start');
+            // Source drafts live outside tldraw's store, so the page snapshot
+            // cannot detect a draft that started while the worker was solving.
+            // Recheck the captured source and draft state at the final write
+            // boundary, before any action in this batch is applied.
+            pending?.validateBeforeApply();
             console.log(
               `[LAYOUT_SOLVED] 📦 Received: richCards=${msg.result.richCards?.length || 0} createdCards=${msg.result.createdCards?.length || 0} codeCards=${msg.result.codeCards?.length || 0} mediaEmbeds=${msg.result.mediaEmbeds?.length || 0} vectors=${msg.result.vectors?.length || 0} groups=${msg.result.groups?.length || 0} connectors=${msg.result.connectors?.length || 0}`
             );
@@ -1133,8 +1637,15 @@ export function useSpatialWorker(editor: Editor | null) {
             }
 
             if (msg.result.actions) {
-              for (const payload of msg.result.actions)
-                handleSolvedAction(payload);
+              runEditorOperationSafely(
+                editor,
+                () => {
+                  for (const payload of msg.result.actions!)
+                    handleSolvedAction(payload);
+                },
+                mark,
+                batchRollbackStatus
+              );
               editor?.markHistoryStoppingPoint('ai_batch_end');
               if (pending) {
                 clearTimeout(pending.timer);
@@ -1143,6 +1654,7 @@ export function useSpatialWorker(editor: Editor | null) {
               }
               break;
             }
+            runEditorOperationSafely(editor, () => {
             const allCreatedIds: TLShapeId[] = [];
 
             // Single-tick Atomic History transaction
@@ -1224,6 +1736,25 @@ export function useSpatialWorker(editor: Editor | null) {
                 )
               );
             }
+            if (msg.result.decks) {
+              msg.result.decks.forEach((deck) => {
+                const id = normalizeId(deck.id) as TLShapeId;
+                const existing = editor?.getShape(id);
+                const rawFrame: SpatialActionFrame = existing
+                  ? {
+                      t: 'patch', op: 'mutate_slide_deck', target: deck.id,
+                      title: deck.title, subtitle: deck.subtitle, theme: deck.theme,
+                      currentSlideIndex: deck.currentSlideIndex, slides: deck.slides,
+                    }
+                  : {
+                      t: 'patch', op: 'create_slide_deck', id: deck.id,
+                      title: deck.title, subtitle: deck.subtitle, theme: deck.theme,
+                      currentSlideIndex: deck.currentSlideIndex, slides: deck.slides,
+                    };
+                applyDeck(deck, rawFrame);
+                allCreatedIds.push(id);
+              });
+            }
             if (msg.result.nodes.length > 0) {
               animateShapesToTargets(msg.result.nodes);
             }
@@ -1247,6 +1778,7 @@ export function useSpatialWorker(editor: Editor | null) {
               editor.setSelectedShapes(ids);
               if (ids.length) editor.zoomToSelection();
             }
+            }, mark, batchRollbackStatus);
             if (editor) editor.markHistoryStoppingPoint('ai_batch_end');
             if (pending) {
               clearTimeout(pending.timer);
@@ -1254,14 +1786,39 @@ export function useSpatialWorker(editor: Editor | null) {
               pending.resolve();
             }
           } catch (error) {
-            if (mark && editor) editor.bailToMark(mark);
+            let rollbackError = batchRollbackStatus.error;
+            if (mark && editor && !batchRollbackStatus.attempted) {
+              try {
+                editor.bailToMark(mark);
+              } catch (rollbackFailure) {
+                rollbackError = rollbackFailure;
+              }
+            }
+            // Solving updates the worker index before the host applies the
+            // result. Rebuild from the post-rollback editor even when rollback
+            // itself failed, so future actions reflect the actual canvas.
+            replaceSpatialIndex();
+            const applyMessage =
+              error instanceof Error ? error.message : String(error);
+            const rollbackMessage = rollbackError
+              ? ` Automatic rollback also failed: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}. The canvas may contain partial changes; inspect it before retrying.`
+              : mark && editor
+                ? ' The batch was rolled back.'
+                : editor
+                  ? ' No rollback checkpoint was available; inspect the canvas for partial changes.'
+                  : '';
+            setState((prev) => ({
+              ...prev,
+              lastActionSummary: `Could not apply the canvas change: ${applyMessage}.${rollbackMessage}`,
+              skeletons: [],
+            }));
             if (pending) {
               clearTimeout(pending.timer);
               pendingRef.current.delete(msg.requestId!);
               pending.reject(
                 error instanceof Error ? error : new Error(String(error))
               );
-            } else console.error('[SpatialWorker apply]', error);
+            } else console.error('[SpatialWorker apply] Canvas action failed.');
           }
 
           break;
@@ -1277,19 +1834,24 @@ export function useSpatialWorker(editor: Editor | null) {
 
         case 'ERROR':
           if (msg.requestId) {
+            directLayoutSnapshotsRef.current.delete(msg.requestId);
             const pending = pendingRef.current.get(msg.requestId);
+            // Solvers can fail after mutating worker-local state. Restore the
+            // live editor snapshot before another operation is allowed through.
+            replaceSpatialIndex();
             if (pending) {
               clearTimeout(pending.timer);
               pendingRef.current.delete(msg.requestId);
               pending.reject(new Error(msg.error));
             }
           }
-          console.error('[SpatialWorker Error]', msg.error);
+          console.error('[SpatialWorker Error] Spatial calculation failed.');
           break;
       }
     };
 
     worker.onerror = () => {
+      directLayoutSnapshotsRef.current.clear();
       for (const p of pendingRef.current.values()) {
         clearTimeout(p.timer);
         p.reject(new Error('Canvas engine failed. Reload to recover.'));
@@ -1310,11 +1872,13 @@ export function useSpatialWorker(editor: Editor | null) {
         p.reject(new Error('Canvas engine stopped.'));
       }
       pendingRef.current.clear();
+      directLayoutSnapshotsRef.current.clear();
       worker.terminate();
       workerRef.current = null;
     };
   }, [
     animateShapesToTargets,
+    replaceSpatialIndex,
     applyCreatedCard,
     applyArtifact,
     applyGroupFrame,
@@ -1327,21 +1891,133 @@ export function useSpatialWorker(editor: Editor | null) {
   useEffect(() => {
     if (!editor) return;
 
-    let timeoutId: NodeJS.Timeout;
-    const unsubscribe = editor.store.listen(() => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        syncShapesWithWorker();
-      }, 60);
+    const queueShape = (id: string, operation: 'upsert' | 'delete') => {
+      queuedIndexChangesRef.current.set(id, operation);
+    };
+    const queueSubtree = (id: string) => {
+      for (const descendantId of collectSpatialDescendants(id)) {
+        queueShape(descendantId, 'upsert');
+      }
+    };
+    const queueBindingArrow = (binding: any) => {
+      if (binding?.typeName !== 'binding' || typeof binding.fromId !== 'string') return;
+      const arrow = editor.getShape(binding.fromId as TLShapeId);
+      if (isShapeOnCurrentPage(arrow)) queueShape(binding.fromId, 'upsert');
+    };
+    const pageIdOfShapeRecord = (record: any) => {
+      let parentId = record.parentId as string;
+      const visited = new Set<string>();
+      while (parentId?.startsWith('shape:')) {
+        if (visited.has(parentId)) return null;
+        visited.add(parentId);
+        const parent = editor.getShape(parentId as TLShapeId);
+        if (!parent) return null;
+        parentId = parent.parentId as string;
+      }
+      return parentId;
+    };
+
+    const unsubscribe = editor.store.listen((entry) => {
+      const storeVersion = editor.store.history.get();
+      if (storeVersion <= indexedStoreVersionRef.current) {
+        observedStoreVersionRef.current = storeVersion;
+        return;
+      }
+      const pageId = editor.getCurrentPageId() as string;
+      if (indexedPageIdRef.current !== pageId) {
+        scheduleSpatialIndexFlush();
+        observedStoreVersionRef.current = storeVersion;
+        return;
+      }
+
+      const { added, updated, removed } = entry.changes;
+      let hasRelevantChange = false;
+      let topologyChanged = false;
+
+      for (const record of Object.values(added)) {
+        if (record.typeName === 'shape' && pageIdOfShapeRecord(record) === pageId) {
+          const id = record.id as string;
+          queueShape(id, 'upsert');
+          topologyChanged = true;
+          hasRelevantChange = true;
+        } else if (record.typeName === 'binding') {
+          queueBindingArrow(record);
+          hasRelevantChange ||= queuedIndexChangesRef.current.has(record.fromId as string);
+        }
+      }
+
+      for (const [before, after] of Object.values(updated)) {
+        if (before.typeName === 'shape' && after.typeName === 'shape') {
+          const id = after.id as string;
+          const wasOnPage =
+            indexedNodesRef.current.has(id) || pageIdOfShapeRecord(before) === pageId;
+          const isOnPage = pageIdOfShapeRecord(after) === pageId;
+          if (!wasOnPage && !isOnPage) continue;
+
+          queueSubtree(id);
+          queueShape(id, isOnPage ? 'upsert' : 'delete');
+          hasRelevantChange = true;
+          if (
+            wasOnPage !== isOnPage ||
+            before.parentId !== after.parentId ||
+            before.index !== after.index
+          ) {
+            topologyChanged = true;
+          }
+        } else if (before.typeName === 'binding' || after.typeName === 'binding') {
+          queueBindingArrow(before);
+          queueBindingArrow(after);
+          hasRelevantChange ||=
+            queuedIndexChangesRef.current.has((before as any).fromId) ||
+            queuedIndexChangesRef.current.has((after as any).fromId);
+        }
+      }
+
+      for (const record of Object.values(removed)) {
+        if (
+          record.typeName === 'shape' &&
+          (indexedNodesRef.current.has(record.id as string) ||
+            pageIdOfShapeRecord(record) === pageId)
+        ) {
+          const id = record.id as string;
+          queueSubtree(id);
+          queueShape(id, 'delete');
+          topologyChanged = true;
+          hasRelevantChange = true;
+        } else if (record.typeName === 'binding') {
+          queueBindingArrow(record);
+          hasRelevantChange ||= queuedIndexChangesRef.current.has(record.fromId as string);
+        }
+      }
+
+      if (!hasRelevantChange) {
+        observedStoreVersionRef.current = storeVersion;
+        return;
+      }
+      if (topologyChanged) {
+        indexOrderDirtyRef.current = true;
+        rebuildSpatialParentIndex();
+      }
+      observedStoreVersionRef.current = storeVersion;
+      scheduleSpatialIndexFlush();
     });
 
-    syncShapesWithWorker();
+    // Initial page snapshot; subsequent selection/session changes are ignored.
+    replaceSpatialIndex();
 
     return () => {
       unsubscribe();
-      clearTimeout(timeoutId);
+      if (indexSyncTimerRef.current) clearTimeout(indexSyncTimerRef.current);
+      indexSyncTimerRef.current = null;
     };
-  }, [editor, syncShapesWithWorker]);
+  }, [
+    editor,
+    collectSpatialDescendants,
+    isShapeOnCurrentPage,
+    rebuildSpatialParentIndex,
+    replaceSpatialIndex,
+    scheduleSpatialIndexFlush,
+  ]);
 
   // Generates culled context payload synchronously for immediate streaming
   const getCulledContextSync = useCallback((): CulledContextPayload => {
@@ -1405,6 +2081,10 @@ export function useSpatialWorker(editor: Editor | null) {
   const streamAIAction = useCallback(
     async (intent: AIIntentPreset, prompt?: string) => {
       if (!editor || !workerRef.current) return;
+      if (editor.getIsReadonly()) {
+        reportReadonlyWrite();
+        return;
+      }
 
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -1415,6 +2095,7 @@ export function useSpatialWorker(editor: Editor | null) {
 
       const sessionId = `stream_${Date.now()}`;
       activeSessionIdRef.current = sessionId;
+      streamPageSnapshotRef.current = captureSpatialPageSnapshot(editor);
       streamStartTimeRef.current = performance.now();
       firstTokenReceivedRef.current = false;
 
@@ -1439,6 +2120,7 @@ export function useSpatialWorker(editor: Editor | null) {
       } satisfies WorkerInMessage);
 
       const culledContext = getCulledContextSync();
+      streamSourceNodesRef.current = culledContext.selectedNodes;
 
       const requestPayload: AISpatialStreamRequest = {
         intent,
@@ -1490,15 +2172,24 @@ export function useSpatialWorker(editor: Editor | null) {
               sessionId,
             } satisfies WorkerInMessage);
           }
+          streamPageSnapshotRef.current = null;
+          streamSourceNodesRef.current = [];
           setState((prev) => ({
             ...prev,
             isStreaming: false,
             streamingAction: null,
-            lastActionSummary: 'Stream cancelled',
+            lastActionSummary: prev.lastActionSummary.startsWith('The canvas changed')
+              ? prev.lastActionSummary
+              : 'Stream cancelled',
             skeletons: [],
           }));
         } else {
-          console.error('[AI Stream Error]', err);
+          streamPageSnapshotRef.current = null;
+          streamSourceNodesRef.current = [];
+          console.error(
+            '[AI Stream Error]',
+            err instanceof Error ? err.name : 'unknown error'
+          );
           const errorMsg = err instanceof Error ? err.message : String(err);
           setState((prev) => ({
             ...prev,
@@ -1510,7 +2201,7 @@ export function useSpatialWorker(editor: Editor | null) {
         }
       }
     },
-    [editor, syncShapesWithWorker, getCulledContextSync]
+    [editor, syncShapesWithWorker, getCulledContextSync, reportReadonlyWrite]
   );
 
   const cancelStream = useCallback(() => {
@@ -1518,27 +2209,40 @@ export function useSpatialWorker(editor: Editor | null) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    activeSessionIdRef.current = null;
+    streamPageSnapshotRef.current = null;
+    streamSourceNodesRef.current = [];
   }, []);
 
   // Spatial Action Dispatchers
   const alignNodes = useCallback(
     (direction: 'horizontal' | 'vertical' | 'grid', margin = 28) => {
       if (!workerRef.current || !editor) return;
+      if (editor.getIsReadonly()) {
+        reportReadonlyWrite();
+        return;
+      }
       const selectedIds = editor.getSelectedShapeIds();
       const allPageShapeIds = Array.from(editor.getCurrentPageShapeIds());
       const targetIds = selectedIds.length > 1 ? selectedIds : allPageShapeIds;
 
       if (targetIds.length < 2) return;
 
+      const requestId = crypto.randomUUID();
+      directLayoutSnapshotsRef.current.set(
+        requestId,
+        captureSpatialPageSnapshot(editor)
+      );
       syncShapesWithWorker();
       workerRef.current.postMessage({
         type: 'ALIGN_NODES',
+        requestId,
         nodeIds: targetIds as string[],
         direction,
         margin,
       } satisfies WorkerInMessage);
     },
-    [editor, syncShapesWithWorker]
+    [editor, syncShapesWithWorker, reportReadonlyWrite]
   );
 
   const dockNode = useCallback(
@@ -1548,72 +2252,146 @@ export function useSpatialWorker(editor: Editor | null) {
       slot: 'top' | 'bottom' | 'left' | 'right' | 'center',
       margin = 24
     ) => {
-      if (!workerRef.current) return;
+      if (!workerRef.current || !editor) return;
+      if (editor.getIsReadonly()) {
+        reportReadonlyWrite();
+        return;
+      }
+      const requestId = crypto.randomUUID();
+      directLayoutSnapshotsRef.current.set(
+        requestId,
+        captureSpatialPageSnapshot(editor)
+      );
       syncShapesWithWorker();
       workerRef.current.postMessage({
         type: 'DOCK_NODE',
+        requestId,
         targetId,
         groupOrAnchorId: anchorId,
         slot,
         margin,
       } satisfies WorkerInMessage);
     },
-    [syncShapesWithWorker]
+    [editor, syncShapesWithWorker, reportReadonlyWrite]
   );
 
   const repelCollisions = useCallback(
     (anchorId?: string, margin = 40) => {
       if (!workerRef.current || !editor) return;
+      if (editor.getIsReadonly()) {
+        reportReadonlyWrite();
+        return;
+      }
       const targetAnchor = anchorId || editor.getOnlySelectedShape()?.id;
       if (!targetAnchor) return;
 
+      const requestId = crypto.randomUUID();
+      directLayoutSnapshotsRef.current.set(
+        requestId,
+        captureSpatialPageSnapshot(editor)
+      );
       syncShapesWithWorker();
       workerRef.current.postMessage({
         type: 'REPEL_COLLISIONS',
+        requestId,
         anchorId: targetAnchor as string,
         margin,
       } satisfies WorkerInMessage);
     },
-    [editor, syncShapesWithWorker]
+    [editor, syncShapesWithWorker, reportReadonlyWrite]
   );
 
   const runSpatialActions = useCallback(
     async (
       actions: SpatialActionFrame[],
       sessionId?: string,
-      signal?: AbortSignal
+      signal?: AbortSignal,
+      transmittedSources: SpatialNodeItem[] = []
     ) => {
       if (!workerRef.current || !editor)
         throw new Error('Canvas engine is not ready.');
+      assertSpatialActionsWritable(editor, actions);
       signal?.throwIfAborted();
       actions.forEach(validateAction);
+      const validateBeforeApply = () => {
+        assertSpatialActionsWritable(editor, actions);
+        assertSpatialSourceContract(actions, transmittedSources, (id) => {
+          const shape = editor.getShape(normalizeId(id) as TLShapeId);
+          return shape
+            ? { type: shape.type, props: shape.props as Record<string, unknown> }
+            : undefined;
+        });
+      };
+      validateBeforeApply();
       const known = new Set(
         editor.getCurrentPageShapes().map((s) => s.id as string)
       );
+      const initiallyKnown = new Set(known);
+      const batchCreated = new Set<string>();
       const knownTypes = new Map(
         editor
           .getCurrentPageShapes()
           .map((s) => [s.id as string, s.type as string])
       );
-      const originals = new Map<string, string>();
       for (const f of actions) {
-        for (const id of [f.target, f.from, f.to, ...(f.nodeIds || [])].filter(
-          Boolean
-        ) as string[]) {
+        const references = [
+          f.target,
+          f.from,
+          f.to,
+          f.anchor,
+          f.group,
+          ...(f.nodeIds || []),
+          ...(f.op.startsWith('mutate_') && !f.target && f.id ? [f.id] : []),
+        ].filter(Boolean) as string[];
+        const relativeAnchor = f.relative?.match(
+          /^(?:right_of|below|left_of|above|next_to):(.+)$/
+        )?.[1];
+        if (relativeAnchor && relativeAnchor !== 'selection')
+          references.push(relativeAnchor);
+
+        for (const id of new Set(references.map(normalizeId))) {
           const normalized = normalizeId(id);
           if (!known.has(normalized))
             throw new Error(
               `Canvas target ${id} no longer exists. Select a target and retry.`
             );
-          const shape = editor.getShape(normalized as TLShapeId);
-          if (shape?.isLocked && !['focus_viewport', 'connect'].includes(f.op))
-            throw new Error('Unlock the target before asking AI to change it.');
-          if (shape) originals.set(normalized, JSON.stringify(shape));
         }
+
+        let writeIds: string[] = [];
+        if (f.op === 'align') writeIds = f.nodeIds || [];
+        else if (f.op === 'create_group') writeIds = f.nodeIds || [];
+        else if (f.op === 'dock_into' && f.target) writeIds = [f.target];
+        else if (f.op === 'delete_shape') writeIds = f.nodeIds || [];
+        else if (
+          [
+            'mutate_artifact',
+            'mutate_document',
+            'mutate_slide_deck',
+            'mutate_rich_card',
+            'mutate_code_card',
+            'mutate_media',
+            'mutate_vector',
+            'mutate_text',
+            'restyle_shape',
+            'move_shape',
+            'resize_shape',
+            'stream_card_patch',
+          ].includes(f.op)
+        ) {
+          const target = f.target || f.id;
+          if (target) writeIds = [target];
+        }
+        for (const id of writeIds) {
+          const shape = editor.getShape(normalizeId(id) as TLShapeId);
+          if (isCanvasShapeLocked(editor, shape))
+            throw new Error('Unlock the target before asking AI to change it.');
+        }
+
         const expected = (
           {
             mutate_artifact: 'artifact',
             mutate_document: 'document',
+            mutate_slide_deck: 'slide_deck',
             mutate_rich_card: 'rich_card',
             mutate_code_card: 'code_card',
             mutate_media: 'media_embed',
@@ -1634,15 +2412,18 @@ export function useSpatialWorker(editor: Editor | null) {
           !f.op.startsWith('mutate_') &&
           f.op !== 'speculative_skeleton'
         ) {
-          if (known.has(normalizeId(f.id)))
+          const newId = normalizeId(f.id);
+          if (initiallyKnown.has(newId) || batchCreated.has(newId))
             throw new Error('Creation would overwrite an existing shape.');
-          known.add(normalizeId(f.id));
+          batchCreated.add(newId);
+          known.add(newId);
           const type = (
             {
               spawn_artifact: 'artifact',
               create_rich_card: 'rich_card',
               create_code_card: 'code_card',
               create_document: 'document',
+              create_slide_deck: 'slide_deck',
               embed_media: 'media_embed',
               draw_vector: 'vector_shape',
               create_group: 'frame',
@@ -1652,6 +2433,7 @@ export function useSpatialWorker(editor: Editor | null) {
           if (type) knownTypes.set(normalizeId(f.id), type);
         }
       }
+      const pageSnapshot = captureSpatialPageSnapshot(editor);
       const requestId = crypto.randomUUID();
       const pageCenter = editor.getViewportPageBounds().center;
       syncShapesWithWorker();
@@ -1679,7 +2461,8 @@ export function useSpatialWorker(editor: Editor | null) {
             reject(e);
           },
           timer,
-          originals,
+          snapshot: pageSnapshot,
+          validateBeforeApply,
         });
         workerRef.current!.postMessage({
           type: 'RUN_ACTIONS',

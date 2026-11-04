@@ -31,6 +31,20 @@ export interface DocSection {
   badge?: string;
 }
 
+export interface SpatialDeckSlide {
+  id: string;
+  title: string;
+  subtitle?: string;
+  layout?: string;
+  bullets?: string[];
+  content?: string;
+  speakerNotes?: string;
+  stats?: Array<{ label: string; value: string; change?: string; [key: string]: unknown }>;
+  columns?: Array<{ title: string; text: string; icon?: string; [key: string]: unknown }>;
+  timelineSteps?: Array<{ step: string; title: string; desc: string; [key: string]: unknown }>;
+  [key: string]: unknown;
+}
+
 export type SpatialOperation =
   | 'speculative_skeleton'
   | 'create_card'
@@ -43,6 +57,8 @@ export type SpatialOperation =
   | 'draw_vector'
   | 'create_document'
   | 'mutate_document'
+  | 'create_slide_deck'
+  | 'mutate_slide_deck'
   | 'mutate_artifact'
   | 'mutate_rich_card'
   | 'mutate_code_card'
@@ -104,6 +120,9 @@ export interface SpatialActionFrame {
   author?: string;
   date?: string;
   sections?: DocSection[];
+  theme?: string;
+  currentSlideIndex?: number;
+  slides?: SpatialDeckSlide[];
   nodeIds?: string[];
   bend?: number;
   w?: number;
@@ -141,6 +160,10 @@ export interface SpatialNodeItem {
   storage?: Record<string, string>;
   archetype?: CardArchetype;
   sections?: DocSection[];
+  theme?: string;
+  currentSlideIndex?: number;
+  slides?: SpatialDeckSlide[];
+  slideCount?: number;
   mediaUrl?: string;
   mediaType?: MediaType;
   vectorType?: VectorGlyphType;
@@ -151,8 +174,16 @@ export interface SpatialNodeItem {
   label?: string;
   zIndex?: number;
   rotation?: number;
+  /** Local dimensions before rotation and parent transforms. */
+  intrinsicW?: number;
+  intrinsicH?: number;
+  /** True when this shape or one of its containing frames is locked. */
+  isLocked?: boolean;
   metadata?: Record<string, unknown>;
 }
+
+/** Small worker update for spatial fields whose content provenance is unchanged. */
+export type SpatialNodePatch = { id: string } & Partial<Omit<SpatialNodeItem, 'id'>>;
 
 export interface SolvedNodeCoordinate {
   id: string;
@@ -284,6 +315,19 @@ export interface SolvedDocItem {
   sections: DocSection[];
 }
 
+export interface SolvedDeckItem {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  title: string;
+  subtitle?: string;
+  theme?: string;
+  currentSlideIndex?: number;
+  slides: SpatialDeckSlide[];
+}
+
 export interface SolvedActionPayload {
   op: SpatialOperation;
   nodes?: SolvedNodeCoordinate[];
@@ -294,6 +338,7 @@ export interface SolvedActionPayload {
   mediaEmbed?: SolvedMediaEmbedItem;
   vector?: SolvedVectorItem;
   document?: SolvedDocItem;
+  deck?: SolvedDeckItem;
   connector?: SolvedConnectorItem;
   group?: SolvedGroupItem;
   textMutation?: SolvedTextMutation;
@@ -316,6 +361,7 @@ export interface SolvedLayoutResult {
   mediaEmbeds?: SolvedMediaEmbedItem[];
   vectors?: SolvedVectorItem[];
   documents?: SolvedDocItem[];
+  decks?: SolvedDeckItem[];
   restyles?: SolvedRestyle[];
   groups?: SolvedGroupItem[];
   connectors?: SolvedConnectorItem[];
@@ -433,7 +479,7 @@ export type AIIntentPreset =
   | 'custom'
   | 'chat';
 
-export type AIProvider = 'gemini' | 'openrouter';
+export type AIProvider = 'gemini' | 'openrouter' | 'openai';
 
 export interface VisualSnapshot {
   mimeType: string;
@@ -453,6 +499,8 @@ export interface AISpatialChatRequest {
   apiKeys?: string[];
   openRouterApiKey?: string;
   openRouterApiKeys?: string[];
+  openaiApiKey?: string;
+  openaiApiKeys?: string[];
   recentEntities?: Array<{ id: string; type: string; title?: string; summary?: string }>;
   thinkingMode?: boolean;
   temperature?: number;
@@ -479,6 +527,8 @@ export interface AIMakeRealRequest {
   apiKeys?: string[];
   openRouterApiKey?: string;
   openRouterApiKeys?: string[];
+  openaiApiKey?: string;
+  openaiApiKeys?: string[];
   selectedShapesContext?: Array<{
     id: string;
     type: string;
@@ -502,16 +552,19 @@ export interface AISpatialStreamRequest {
   apiKeys?: string[];
   openRouterApiKey?: string;
   openRouterApiKeys?: string[];
+  openaiApiKey?: string;
+  openaiApiKeys?: string[];
 }
 
 // Worker Communication Protocol Messages
 export type WorkerInMessage =
-  | { type: 'SYNC_INDEX'; nodes: SpatialNodeItem[] }
+  | { type: 'SYNC_INDEX'; nodes: SpatialNodeItem[]; pageId?: string; revision?: number }
+  | { type: 'PATCH_INDEX'; pageId: string; revision: number; nodes: SpatialNodePatch[]; deletedIds: string[] }
   | { type: 'RUN_ACTIONS'; requestId?: string; actions: SpatialActionFrame[]; viewportCenter?: { x: number; y: number }; sessionId?: string }
   | { type: 'SOLVE_DAG_PLAN'; plan: DAGExecutionPlan; viewportCenter?: { x: number; y: number }; sessionId?: string }
-  | { type: 'ALIGN_NODES'; nodeIds: string[]; direction: 'horizontal' | 'vertical' | 'grid'; margin?: number }
-  | { type: 'DOCK_NODE'; targetId: string; groupOrAnchorId: string; slot: 'top' | 'bottom' | 'left' | 'right' | 'center'; margin?: number }
-  | { type: 'REPEL_COLLISIONS'; anchorId: string; margin?: number }
+  | { type: 'ALIGN_NODES'; requestId?: string; nodeIds: string[]; direction: 'horizontal' | 'vertical' | 'grid'; margin?: number }
+  | { type: 'DOCK_NODE'; requestId?: string; targetId: string; groupOrAnchorId: string; slot: 'top' | 'bottom' | 'left' | 'right' | 'center'; margin?: number }
+  | { type: 'REPEL_COLLISIONS'; requestId?: string; anchorId: string; margin?: number }
   | { type: 'QUERY_VIEWPORT'; viewport: ViewportQuery; selectedIds?: string[] }
   | { type: 'STREAM_START'; sessionId: string; viewportCenter?: { x: number; y: number } }
   | { type: 'STREAM_CHUNK'; sessionId: string; chunk: string }
@@ -521,7 +574,9 @@ export type WorkerInMessage =
   | { type: 'STREAM_ABORT'; sessionId: string };
 
 export type WorkerOutMessage =
-  | { type: 'INDEX_SYNCED'; count: number }
+  | { type: 'INDEX_SYNCED'; count: number; pageId?: string; revision?: number }
+  | { type: 'INDEX_PATCHED'; count: number; pageId: string; revision: number; updatedCount: number; deletedCount: number }
+  | { type: 'INDEX_RESYNC_REQUIRED'; pageId: string; expectedRevision: number; receivedRevision: number }
   | { type: 'LAYOUT_SOLVED'; requestId?: string; result: SolvedLayoutResult }
   | { type: 'DAG_PLAN_SOLVED'; plan: DAGExecutionPlan; skeletons: SpeculativeSkeletonBounds[] }
   | { type: 'VIEWPORT_CULLED'; payload: CulledContextPayload }

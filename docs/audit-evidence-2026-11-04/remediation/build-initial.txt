@@ -1,0 +1,25 @@
+$ next build
+   ▲ Next.js 15.5.28
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 5.2s
+   Linting and checking validity of types ...
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+   	- include was updated to add '.next-release-fix/types/**/*.ts'
+
+Failed to compile.
+
+.next-review/types/app/api/ai/openai-check/route.ts:2:24
+Type error: Cannot find module '../../../../../../src/app/api/ai/openai-check/route.js' or its corresponding type declarations.
+
+[0m [90m 1 |[39m [90m// File: /Users/koushikk/Documents/projects/visionOS/src/app/api/ai/openai-check/route.ts[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m [33m*[39m [36mas[39m entry [36mfrom[39m [32m'../../../../../../src/app/api/ai/openai-check/route.js'[39m
+ [90m   |[39m                        [31m[1m^[22m[39m
+ [90m 3 |[39m [36mimport[39m type { [33mNextRequest[39m } [36mfrom[39m [32m'next/server.js'[39m
+ [90m 4 |[39m
+ [90m 5 |[39m type [33mTEntry[39m [33m=[39m [36mtypeof[39m [36mimport[39m([32m'../../../../../../src/app/api/ai/openai-check/route.js'[39m)[0m
+Next.js build worker exited with code: 1 and signal: null
+error: script "build" exited with code 1

@@ -1,43 +1,36 @@
 'use client';
 
+import { GenerationGlow } from './GenerationGlow';
+import { AIOrb } from './AIOrb';
+
+
 import React, {
   useState,
   useRef,
   useEffect,
-  useMemo,
+  useLayoutEffect,
   useCallback,
 } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
-  Sparkles,
   Send,
   Loader2,
   ChevronDown,
   ChevronUp,
   X,
-  Zap,
   Square,
-  Sliders,
   Check,
   Copy,
   Plus,
-  ShieldCheck,
-  Network,
-  SquarePen,
   KeyRound,
-  CheckCircle2,
-  CircleDashed,
-  Eye,
-  Camera,
+  SquarePen,
   Wand2,
-  MessageSquare,
-  LayoutGrid,
   Mic,
   MicOff,
   Maximize2,
   Minimize2,
   Brain,
-  Trash2,
   Command,
   FileText,
   Cpu,
@@ -47,16 +40,172 @@ import {
 import { marked } from 'marked';
 import katex from 'katex';
 import DOMPurify from 'dompurify';
-import { ThinkingOrb } from 'thinking-orbs';
-import { BorderBeam } from 'border-beam';
 import { VoiceBeam, useMicrophone } from 'voice-glow';
 import type { useSpatialAI } from '../hooks/useSpatialAI';
 import type { useSpatialWorker } from '../hooks/useSpatialWorker';
-import type { DAGExecutionPlan, DAGExecutionNode } from '../types/spatial';
+import { useVisibleViewport } from '../hooks/useVisibleViewport';
+import ProviderSetup from './ProviderSetup';
 
 export interface SpatialAIOmnibarProps {
+  active?: boolean;
   ai: ReturnType<typeof useSpatialAI>;
   spatial?: ReturnType<typeof useSpatialWorker>;
+  initialDraft?: string;
+  draftId?: string;
+  onDraftConsumed?: () => void;
+}
+
+export type ComposerSubmission =
+  | { kind: 'idle' }
+  | { kind: 'provider-setup'; draft: string }
+  | { kind: 'send'; prompt: string };
+
+export function resolveComposerSubmission(
+  draft: string,
+  hasActiveKey: boolean,
+  isGenerating: boolean
+): ComposerSubmission {
+  const prompt = draft.trim();
+  if (!prompt || isGenerating) return { kind: 'idle' };
+  return hasActiveKey
+    ? { kind: 'send', prompt }
+    : { kind: 'provider-setup', draft };
+}
+
+function CalmAIIcon({ size = 20 }: { size?: number }) {
+  return (
+    <AIOrb
+      aria-hidden="true"
+      style={{ width: size, height: size, color: 'var(--studio-action, #9cb8ff)' }}
+      strokeWidth={1.6}
+    />
+  );
+}
+
+/** Keeps AnimatePresence inside the DOM portal and gives it a valid React child. */
+export function createSpatialAIPanelPortal(
+  isOpen: boolean,
+  panel: React.ReactElement,
+  target: Element | null
+) {
+  if (!target) return null;
+  return createPortal(
+    <AnimatePresence>{isOpen ? panel : null}</AnimatePresence>,
+    target
+  );
+}
+
+export async function copyTextToClipboard(
+  text: string,
+  clipboard?: Pick<Clipboard, 'writeText'> | null,
+  doc?: Document | null
+): Promise<boolean> {
+  let clipboardApi: Pick<Clipboard, 'writeText'> | null = null;
+  try {
+    clipboardApi = clipboard === undefined
+      ? (typeof navigator !== 'undefined' ? navigator.clipboard : null)
+      : clipboard;
+    if (clipboardApi?.writeText) {
+      await clipboardApi.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fall through to the selection-based copy path when browser permission is denied.
+  }
+
+  let documentRef: Document | null = null;
+  let textArea: HTMLTextAreaElement | null = null;
+  let previouslyFocused: HTMLElement | null = null;
+  let previousSelection: {
+    start: number | null;
+    end: number | null;
+    direction: 'forward' | 'backward' | 'none' | null;
+  } | null = null;
+  try {
+    documentRef = doc === undefined
+      ? (typeof document !== 'undefined' ? document : null)
+      : doc;
+    if (!documentRef?.body || typeof documentRef.execCommand !== 'function') return false;
+
+    try {
+      const activeElement = documentRef.activeElement as HTMLElement | null;
+      if (activeElement && typeof activeElement.focus === 'function') {
+        previouslyFocused = activeElement;
+        if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') {
+          const textControl = activeElement as HTMLInputElement | HTMLTextAreaElement;
+          previousSelection = {
+            start: textControl.selectionStart,
+            end: textControl.selectionEnd,
+            direction: textControl.selectionDirection,
+          };
+        }
+      }
+    } catch {
+      // Copying still works if the current focus or selection cannot be read.
+    }
+
+    textArea = documentRef.createElement('textarea');
+    textArea.value = text;
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    documentRef.body.appendChild(textArea);
+    textArea.select();
+    return documentRef.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    try {
+      textArea?.remove();
+    } catch {
+      // Cleanup failure must not turn an unsuccessful copy into a rejected promise.
+    }
+    if (previouslyFocused && previouslyFocused.isConnected) {
+      try {
+        previouslyFocused.focus({ preventScroll: true });
+      } catch {
+        try {
+          previouslyFocused.focus();
+        } catch {
+          // Focus restoration is best effort when the original target is no longer focusable.
+        }
+      }
+      if (previousSelection && previousSelection.start !== null && previousSelection.end !== null) {
+        try {
+          (previouslyFocused as HTMLInputElement | HTMLTextAreaElement).setSelectionRange(
+            previousSelection.start,
+            previousSelection.end,
+            previousSelection.direction ?? 'none'
+          );
+        } catch {
+          // Some input types do not support selection ranges.
+        }
+      }
+    }
+  }
+}
+
+export function insertDictationAtSelection(
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  transcript: string
+): { value: string; caret: number } {
+  const start = Math.max(0, Math.min(value.length, Math.trunc(selectionStart)));
+  const end = Math.max(start, Math.min(value.length, Math.trunc(selectionEnd)));
+  const insertion = transcript.trim();
+  const before = value.slice(0, start);
+  const after = value.slice(end);
+  const leadingSpace = before && !/\s$/.test(before) && insertion && !/^[,.;!?…:)}\]]/.test(insertion)
+    ? ' '
+    : '';
+  const trailingSpace = after && !/^\s/.test(after) && insertion && !/^[,.;!?…:)}\]]/.test(after)
+    ? ' '
+    : '';
+  return {
+    value: `${before}${leadingSpace}${insertion}${trailingSpace}${after}`,
+    caret: start + leadingSpace.length + insertion.length,
+  };
 }
 
 function maskApiKey(key: string): string {
@@ -131,24 +280,38 @@ function renderChatMarkdownWithKaTeX(rawText: string): string {
 }
 
 function CopyMessageButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleCopy = (e: React.MouseEvent) => {
+  useEffect(() => () => {
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+  }, []);
+
+  const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
+    let succeeded = false;
+    try {
+      succeeded = await copyTextToClipboard(text);
+    } catch {
+      succeeded = false;
+    }
+    setCopyState(succeeded ? 'copied' : 'failed');
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(() => setCopyState('idle'), 2200);
   };
 
   return (
     <button
       onClick={handleCopy}
       type="button"
-      title={copied ? 'Copied to clipboard' : 'Copy message text'}
-      className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 active:scale-[0.96] transition-all shrink-0"
+      title={copyState === 'copied' ? 'Copied to clipboard' : copyState === 'failed' ? 'Copy failed' : 'Copy message text'}
+      aria-label={copyState === 'copied' ? 'Copied to clipboard' : copyState === 'failed' ? 'Copy failed. Try again.' : 'Copy message text'}
+      className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 active:scale-[0.96] transition-[color,background-color,border-color,opacity,transform] shrink-0"
     >
-      {copied ? (
+      {copyState === 'copied' ? (
         <Check className="h-4 w-4 text-emerald-400" strokeWidth={1.5} />
+      ) : copyState === 'failed' ? (
+        <X className="h-4 w-4 text-rose-300" strokeWidth={1.5} />
       ) : (
         <Copy className="h-4 w-4" strokeWidth={1.5} />
       )}
@@ -199,6 +362,7 @@ function VisionThinkingAccordion({
   durationMs?: number;
   isStreaming?: boolean;
 }) {
+  const reduceMotion = useReducedMotion() ?? false;
   const [userToggled, setUserToggled] = useState(false);
   const [isExpanded, setIsExpanded] = useState(() => Boolean(isStreaming));
 
@@ -211,21 +375,17 @@ function VisionThinkingAccordion({
   if (!thought) return null;
 
   return (
-    <div className="mb-2 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md overflow-hidden text-xs transition-all">
+    <div className="mb-2 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md overflow-hidden text-xs transition-[color,background-color,border-color,opacity,transform]">
       <button
         type="button"
         onClick={() => {
           setUserToggled(true);
           setIsExpanded(!isExpanded);
         }}
-        className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 bg-white/[0.02] hover:bg-white/[0.05] active:scale-[0.96] transition-all text-white/80"
+        className="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2 bg-white/[0.02] hover:bg-white/[0.05] active:scale-[0.96] transition-[color,background-color,border-color,opacity,transform] text-white/80"
       >
         <div className="flex items-center gap-2 font-medium">
-          <ThinkingOrb
-            size={20}
-            state={isStreaming ? 'solving' : 'breathing'}
-            theme="dark"
-          />
+          <CalmAIIcon size={18} />
           <span className="font-semibold text-[11px] text-white/90">
             Reasoning Chain
           </span>
@@ -253,7 +413,7 @@ function VisionThinkingAccordion({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: reduceMotion ? 0 : 0.2 }}
             className="p-3 text-[11px] font-mono leading-relaxed text-white/70 whitespace-pre-wrap max-h-56 overflow-y-auto border-t border-white/10 bg-black/40 custom-card-scrollbar select-text cursor-text"
           >
             {thought}
@@ -264,152 +424,115 @@ function VisionThinkingAccordion({
   );
 }
 
-const ROTATING_THINKING_PHRASES = [
-  'Thinking...',
-  'Pondering spatial topology...',
-  'Synthesizing UI components...',
-  'Refining layout & design...',
-  'Architecting interactive logic...',
-  'Validating spatial constraints...',
-];
-
-function VisionRotatingThinkingIndicator() {
-  const [phraseIndex, setPhraseIndex] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setPhraseIndex((prev) => (prev + 1) % ROTATING_THINKING_PHRASES.length);
-    }, 2200);
-    return () => clearInterval(timer);
-  }, []);
-
+function ResponseLoadingIndicator() {
   return (
-    <div className="flex items-center gap-2.5 py-2 px-1 text-white/70 select-none">
-      <div className="flex h-5 w-5 items-center justify-center shrink-0">
-        <ThinkingOrb size={20} state="solving" theme="dark" />
-      </div>
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={phraseIndex}
-          initial={{ opacity: 0, y: 3 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -3 }}
-          transition={{ duration: 0.25, ease: 'easeInOut' }}
-          className="text-xs font-medium text-slate-300 font-sans tracking-wide"
-        >
-          {ROTATING_THINKING_PHRASES[phraseIndex]}
-        </motion.span>
-      </AnimatePresence>
+    <div role="status" className="flex items-center gap-2.5 py-2 px-1 text-white/70">
+      <AIOrb active />
+      <span className="text-sm font-medium text-slate-300">Generating response…</span>
     </div>
   );
 }
 
-function VisionDAGPlanTree({
-  plan,
-  nodes,
-}: {
-  plan?: DAGExecutionPlan;
-  nodes?: DAGExecutionNode[];
-}) {
-  if (!plan && (!nodes || nodes.length === 0)) return null;
-
-  const displayNodes = nodes && nodes.length > 0 ? nodes : plan?.nodes || [];
-
-  return (
-    <div className="mb-2.5 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-3 text-xs shadow-md">
-      <div className="flex items-center justify-between mb-2.5">
-        <div className="flex items-center gap-2 text-white/90 font-semibold text-[11px]">
-          <Network className="h-4 w-4 text-white/70" strokeWidth={1.5} />
-          <span>Swarm Task Plan: {plan?.title || 'Execution DAG'}</span>
-        </div>
-        <span className="text-[9px] font-mono tabular-nums text-white/60 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
-          Parallel Workers
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {displayNodes.map((n) => {
-          const isDone = n.status === 'completed';
-          const isStreaming = n.status === 'streaming';
-
-          return (
-            <div
-              key={n.id}
-              className={`flex items-center justify-between gap-2 p-2.5 rounded-xl border text-[11px] transition-all ${
-                isDone
-                  ? 'border-emerald-500/30 bg-emerald-950/20 text-emerald-200'
-                  : isStreaming
-                    ? 'border-white/20 bg-white/10 text-white animate-pulse'
-                    : 'border-white/10 bg-white/5 text-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-2 truncate">
-                {isDone ? (
-                  <CheckCircle2
-                    className="h-4 w-4 text-emerald-400 shrink-0"
-                    strokeWidth={1.5}
-                  />
-                ) : isStreaming ? (
-                  <Loader2
-                    className="h-4 w-4 text-white animate-spin shrink-0"
-                    strokeWidth={1.5}
-                  />
-                ) : (
-                  <CircleDashed
-                    className="h-4 w-4 text-slate-500 shrink-0"
-                    strokeWidth={1.5}
-                  />
-                )}
-                <span className="truncate font-medium">
-                  {'title' in n && n.title
-                    ? n.title
-                    : 'label' in n && n.label
-                      ? n.label
-                      : n.id}
-                </span>
-              </div>
-              <span className="text-[9px] font-mono opacity-70 shrink-0 uppercase tracking-wider">
-                {n.modality}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
+export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({
+  ai,
+  active = true,
+  initialDraft,
+  draftId,
+  onDraftConsumed,
+}) => {
+  const reduceMotion = useReducedMotion() ?? false;
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showProviderSetup, setShowProviderSetup] = useState(false);
   const [showActionMenu, setShowActionMenu] = useState(false);
+  const [showContextExplanation, setShowContextExplanation] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [providerSaveNotice, setProviderSaveNotice] = useState('');
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
-
-  // Settings State
-  const [modelInput, setModelInput] = useState(() => ai.activeModel || 'gemini-3.8-flash');
-  const [newKeyInput, setNewKeyInput] = useState('');
-  const [isAddingKey, setIsAddingKey] = useState(false);
-
-  useEffect(() => {
-    if (ai.activeModel && ai.activeModel !== 'gemini') {
-      setModelInput(ai.activeModel);
-    } else {
-      setModelInput('gemini-3.8-flash');
-    }
-  }, [ai.activeModel]);
+  const lastDraftIdentityRef = useRef<string | null>(null);
+  const viewport = useVisibleViewport();
+  const viewportPadding = {
+    top: Math.max(viewport.width <= 640 ? 10 : 24, viewport.safeAreaInsets.top),
+    right: Math.max(viewport.width <= 640 ? 10 : 24, viewport.safeAreaInsets.right),
+    bottom: Math.max(viewport.width <= 640 ? 10 : 24, viewport.safeAreaInsets.bottom),
+    left: Math.max(viewport.width <= 640 ? 10 : 24, viewport.safeAreaInsets.left),
+  };
+  const availablePanelWidth = Math.max(
+    0,
+    viewport.width - viewportPadding.left - viewportPadding.right
+  );
+  const availablePanelHeight = Math.max(
+    0,
+    viewport.height - viewportPadding.top - viewportPadding.bottom
+  );
+  const isCompact = viewport.width <= 640;
+  const panelWidth = Math.min(isCompact ? 520 : isExpanded ? 680 : 480, availablePanelWidth);
+  const conversationMessages = ai.messages.filter((message) => message.id !== 'welcome');
+  const panelHeight = isCompact
+    ? Math.min(
+        availablePanelHeight,
+        isExpanded
+          ? availablePanelHeight
+          : Math.max(360, Math.min(680, availablePanelHeight * 0.88))
+      )
+    : Math.min(isExpanded ? 760 : Math.max(460, viewport.height * 0.72), availablePanelHeight);
 
   // Voice Dictation with Web Speech API & Voice Glow
   const mic = useMicrophone();
+  const startMicrophone = mic.start;
+  const stopMicrophone = mic.stop;
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const dictationAnchorRef = useRef<{ value: string; start: number; end: number } | null>(null);
+  const dictationCaretRef = useRef<number | null>(null);
+  const microphoneStartRef = useRef<Promise<MediaStream | null> | null>(null);
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
   const isMicLive = mic.state === 'live' || isListening;
+
+  const requestMicrophone = useCallback(() => {
+    if (!microphoneStartRef.current) {
+      const pendingStart = startMicrophone().finally(() => {
+        if (microphoneStartRef.current === pendingStart) {
+          microphoneStartRef.current = null;
+        }
+      });
+      microphoneStartRef.current = pendingStart;
+    }
+    return microphoneStartRef.current;
+  }, [startMicrophone]);
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input || !isOpen) return;
+    let lastWidth = -1;
+    let resizeFrame = 0;
+    const fitDraft = () => {
+      input.style.height = '44px';
+      input.style.height = `${Math.min(150, Math.max(44, input.scrollHeight))}px`;
+    };
+    fitDraft();
+    const observer = new ResizeObserver(() => {
+      // Observe wrapping changes without feeding height changes back into layout.
+      if (input.clientWidth === lastWidth) return;
+      lastWidth = input.clientWidth;
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(fitDraft);
+    });
+    observer.observe(input);
+    return () => { observer.disconnect(); cancelAnimationFrame(resizeFrame); };
+  }, [inputText, isOpen]);
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    const caret = dictationCaretRef.current;
+    if (input && caret !== null) input.setSelectionRange(caret, caret);
+  }, [inputText]);
 
   // Click outside to dismiss Action Menu popover
   useEffect(() => {
@@ -442,13 +565,22 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
 
   // Keyboard shortcut: Cmd+K / Ctrl+K / / opens Omnibar
   useEffect(() => {
+    if (!active) return;
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target;
+      if (target instanceof Element && target.closest('[role="dialog"][aria-modal="true"]')) return;
+      const isTextEntry =
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.matches('input, textarea, select, [role="textbox"]'));
+
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsOpen((prev) => !prev);
       } else if (
         e.key === '/' &&
-        !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)
+        !e.isComposing &&
+        !isTextEntry
       ) {
         e.preventDefault();
         setIsOpen(true);
@@ -460,25 +592,33 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, active]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && active) {
       setTimeout(() => inputRef.current?.focus(), 80);
     }
-  }, [isOpen]);
+  }, [isOpen, active]);
 
-  // Sync model input state
+  // Load each external draft once. Opening or closing the composer never sends
+  // it, and edits remain in component state after the parent acknowledges it.
   useEffect(() => {
-    setModelInput(ai.activeModel);
-  }, [ai.activeModel]);
+    if (typeof initialDraft !== 'string') return;
+    const identity = draftId ? `id:${draftId}` : `text:${initialDraft}`;
+    if (lastDraftIdentityRef.current === identity) return;
+    lastDraftIdentityRef.current = identity;
+    setInputText(initialDraft);
+    setIsOpen(true);
+    setShowActionMenu(false);
+    onDraftConsumed?.();
+  }, [initialDraft, draftId, onDraftConsumed]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (!isUserScrolledUp) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
     }
-  }, [ai.messages, isUserScrolledUp]);
+  }, [ai.messages, isUserScrolledUp, reduceMotion]);
 
   const handleScroll = () => {
     if (!chatScrollRef.current) return;
@@ -488,27 +628,46 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
     setIsUserScrolledUp(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || ai.isGenerating) return;
-    ai.sendMessage(inputText.trim());
+    const submission = resolveComposerSubmission(inputText, ai.hasActiveKey, ai.isGenerating);
+    if (submission.kind === 'idle') return;
+    if (submission.kind === 'provider-setup') {
+      setShowProviderSetup(true);
+      return;
+    }
+    ai.sendMessage(submission.prompt);
     setInputText('');
+    setProviderSaveNotice('');
     setIsUserScrolledUp(false);
+  };
+
+  const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const nativeEvent = event.nativeEvent;
+    if (
+      event.key === 'Enter' &&
+      !event.shiftKey &&
+      !nativeEvent.isComposing &&
+      nativeEvent.keyCode !== 229
+    ) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+    }
   };
 
   const handleNewChat = () => {
     ai.clearChat();
     setIsUserScrolledUp(false);
-    setShowSettings(false);
     setShowActionMenu(false);
   };
 
   const handleActionPreset = (presetPrompt: string) => {
-    ai.sendMessage(presetPrompt);
+    setInputText(presetPrompt);
+    setIsOpen(true);
     setShowActionMenu(false);
     setIsUserScrolledUp(false);
   };
@@ -525,61 +684,134 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
     }
 
     try {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.abort(); } catch {}
+      const previousRecognition = recognitionRef.current;
+      recognitionRef.current = null;
+      if (previousRecognition) {
+        previousRecognition.onstart = null;
+        previousRecognition.onresult = null;
+        previousRecognition.onerror = null;
+        previousRecognition.onend = null;
+        try { previousRecognition.abort(); } catch {}
       }
 
+      const input = inputRef.current;
+      const value = input?.value ?? inputText;
+      const start = input?.selectionStart ?? value.length;
+      const end = input?.selectionEnd ?? start;
+      dictationAnchorRef.current = { value, start, end };
+      dictationCaretRef.current = null;
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = typeof navigator !== 'undefined' ? navigator.language || 'en-US' : 'en-US';
 
       recognition.onstart = () => {
+        if (!isOpenRef.current || recognitionRef.current !== recognition) return;
         setIsListening(true);
-        mic.start().catch(() => {});
+        void requestMicrophone()
+          .then(() => {
+            // getUserMedia cannot be cancelled while permission is pending. If
+            // this recognizer was stopped before it resolves, release the late
+            // stream unless a replacement recognizer now owns the microphone.
+            if (!isOpenRef.current || recognitionRef.current === null) {
+              stopMicrophone();
+            }
+          })
+          .catch(() => {});
       };
 
       recognition.onresult = (event: any) => {
+        if (!isOpenRef.current || recognitionRef.current !== recognition) return;
         let transcript = '';
         for (let i = 0; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
         }
         if (transcript) {
-          setInputText(transcript);
+          const anchor = dictationAnchorRef.current;
+          if (!anchor) return;
+          const insertion = insertDictationAtSelection(
+            anchor.value,
+            anchor.start,
+            anchor.end,
+            transcript
+          );
+          dictationCaretRef.current = insertion.caret;
+          setInputText(insertion.value);
         }
       };
 
       recognition.onerror = (event: any) => {
+        if (recognitionRef.current !== recognition) return;
         console.warn('[visionOS] Speech recognition error:', event.error);
         if (event.error !== 'no-speech') {
+          recognitionRef.current = null;
+          recognition.onstart = null;
+          recognition.onresult = null;
+          recognition.onerror = null;
+          recognition.onend = null;
+          try { recognition.abort(); } catch {}
           setIsListening(false);
-          mic.stop();
+          stopMicrophone();
         }
       };
 
       recognition.onend = () => {
-        setIsListening(false);
-        mic.stop();
+        if (recognitionRef.current === recognition) {
+          recognitionRef.current = null;
+          setIsListening(false);
+          stopMicrophone();
+        }
       };
 
       recognitionRef.current = recognition;
       recognition.start();
     } catch (err) {
       console.error('[visionOS] Speech recognition failed to start:', err);
+      const failedRecognition = recognitionRef.current;
+      recognitionRef.current = null;
+      if (failedRecognition) {
+        failedRecognition.onstart = null;
+        failedRecognition.onresult = null;
+        failedRecognition.onerror = null;
+        failedRecognition.onend = null;
+      }
       setIsListening(false);
-      mic.stop();
+      stopMicrophone();
     }
-  }, [mic]);
+  }, [inputText, requestMicrophone, stopMicrophone]);
 
   const stopVoice = useCallback(() => {
-    if (recognitionRef.current) {
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    if (recognition) {
+      recognition.onstart = null;
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
       try {
-        recognitionRef.current.stop();
+        recognition.stop();
       } catch {}
     }
     setIsListening(false);
-    mic.stop();
-  }, [mic]);
+    stopMicrophone();
+  }, [stopMicrophone]);
+
+  useEffect(() => {
+    if (!isOpen) stopVoice();
+  }, [isOpen, stopVoice]);
+
+  useEffect(() => () => {
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    if (recognition) {
+      recognition.onstart = null;
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      try { recognition.abort(); } catch {}
+    }
+    stopMicrophone();
+  }, [stopMicrophone]);
 
   const toggleVoice = useCallback(() => {
     if (isListening || mic.state === 'live') {
@@ -589,66 +821,48 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
     }
   }, [isListening, mic.state, startVoice, stopVoice]);
 
-  const handleSaveModel = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!modelInput.trim()) return;
-    if (ai.provider === 'openrouter') {
-      ai.setOpenRouterModel(modelInput.trim());
-    } else {
-      ai.setGeminiModel(modelInput.trim());
-    }
-  };
+  const handlePromptInputChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    dictationCaretRef.current = null;
+    if (recognitionRef.current) stopVoice();
+    setInputText(event.currentTarget.value);
+  }, [stopVoice]);
 
-  const handleAddKey = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newKeyInput.trim()) return;
-    if (ai.provider === 'openrouter') {
-      ai.addOpenRouterKey(newKeyInput.trim());
-    } else {
-      ai.addGeminiKey(newKeyInput.trim());
-    }
-    setNewKeyInput('');
-    setIsAddingKey(false);
-  };
-
-  const handleRemoveKey = (key: string) => {
-    if (ai.provider === 'openrouter') {
-      ai.removeOpenRouterKey(key);
-    } else {
-      ai.removeGeminiKey(key);
-    }
-  };
-
-  const activeKeys =
-    ai.provider === 'openrouter' ? ai.openRouterApiKeys : ai.geminiApiKeys;
+  const handlePromptSelectionChange = useCallback((event: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    if (!recognitionRef.current) return;
+    const caret = dictationCaretRef.current;
+    const input = event.currentTarget;
+    if (caret !== null && input.selectionStart === caret && input.selectionEnd === caret) return;
+    dictationCaretRef.current = null;
+    stopVoice();
+  }, [stopVoice]);
 
   const quickStarters = [
     {
-      label: '✨ Make Real: Sketch to App',
+      label: 'Make Real: Sketch to App',
       prompt:
         'Make Real: Turn the selected sketch/wireframe into an interactive, responsive live app with persistent storage.',
       icon: Wand2,
     },
     {
-      label: '⚡ Microservices Architecture',
+      label: 'Microservices Architecture',
       prompt:
         'Build a distributed microservices cloud architecture on canvas with API Gateway, Auth Microservice, Redis Message Queue, and PostgreSQL Database cylinder, connecting them with labeled arrows.',
       icon: Cpu,
     },
     {
-      label: '📑 Whitepaper Document Spec',
+      label: 'Whitepaper Document Spec',
       prompt:
         'Create a comprehensive technical document specification for a distributed Byzantine Fault Tolerant consensus engine, including Executive Summary, Mathematical Foundations, and Network Architecture sections.',
       icon: FileText,
     },
     {
-      label: '🎮 Physics Simulation Sandbox',
+      label: 'Physics Simulation Sandbox',
       prompt:
         'Spawn an interactive live physics sandbox with particle gravity simulation and velocity controls with persistent storage.',
       icon: Flame,
     },
     {
-      label: '📊 2x2 Strategic SWOT Matrix',
+      label: '2x2 Strategic SWOT Matrix',
       prompt:
         'Generate a comprehensive 2x2 SWOT Strategic Analysis matrix with color-coded quadrants.',
       icon: Layers,
@@ -660,22 +874,25 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* 1. Floating Bottom-Right visionOS Omnibar Trigger Pill (Desktop HUD) */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {!isOpen && (
-        <div className="fixed bottom-6 right-6 z-[300] pointer-events-auto select-none">
+      {active && !isOpen && (
+        <div
+          data-canvas-chrome="ai-launcher"
+          className="fixed bottom-6 right-6 z-[300] pointer-events-auto"
+        >
           <motion.button
+            type="button"
             onClick={() => setIsOpen(true)}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.96 }}
-            className="flex items-center gap-3 rounded-full liquid-glass-pill px-4 py-2 border border-white/10 shadow-[0_12px_32px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.16)] text-white hover:border-white/25 transition-all antialiased backdrop-blur-3xl"
+            whileHover={reduceMotion ? undefined : { scale: 1.02 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+            aria-label="Ask AI"
+            className="studio-ai-launcher flex min-h-[48px] items-center gap-3 rounded-full px-4 py-2 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--studio-action,#9cb8ff)]"
           >
             <div className="flex h-6 w-6 items-center justify-center">
-              <ThinkingOrb size={20} state="breathing" theme="dark" />
+              <CalmAIIcon size={20} />
             </div>
-            <span className="text-xs font-medium text-slate-200">
-              Ask visionOS Spatial AI...
-            </span>
-            <kbd className="flex items-center gap-0.5 rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-mono tabular-nums text-slate-300">
-              <Command className="h-3 w-3" strokeWidth={1.5} /> K
+            <span className="text-sm">Ask AI</span>
+            <kbd className="flex items-center gap-0.5 rounded-full border border-current/15 bg-current/5 px-2 py-0.5 text-xs font-mono tabular-nums opacity-75">
+              <Command className="h-3 w-3" strokeWidth={1.5} aria-hidden="true" /> K
             </kbd>
           </motion.button>
         </div>
@@ -684,88 +901,98 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* 2. visionOS Spatial Intelligence Liquid Glass Panel                 */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {isOpen && (
-          <aside
-            aria-label="visionOS Spatial Intelligence Panel"
+      {typeof document !== 'undefined' && createSpatialAIPanelPortal(
+        active && isOpen,
+          <motion.aside
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.2 }}
+            aria-label="Ask AI"
             data-visionos-panel="true"
-            className="fixed bottom-6 right-6 z-[350] flex flex-col items-end pointer-events-auto select-none"
+            style={{
+              position: 'fixed',
+              left: viewport.left,
+              top: viewport.top,
+              width: viewport.width,
+              height: viewport.height,
+              boxSizing: 'border-box',
+              paddingTop: viewportPadding.top,
+              paddingRight: viewportPadding.right,
+              paddingBottom: viewportPadding.bottom,
+              paddingLeft: viewportPadding.left,
+            }}
+            className="z-[750] flex flex-col items-end justify-end pointer-events-none"
           >
             <motion.div
               style={{
-                width: isExpanded ? 580 : 420,
-                height: isExpanded ? 760 : 580,
+                width: panelWidth,
+                height: panelHeight,
+                maxWidth: '100%',
+                maxHeight: '100%',
+                pointerEvents: 'auto',
               }}
-              initial={{
+              initial={reduceMotion ? false : {
                 opacity: 0,
-                y: 20,
+                y: 8,
                 scale: 0.96,
-                width: isExpanded ? 580 : 420,
-                height: isExpanded ? 760 : 580,
+                width: panelWidth,
+                height: panelHeight,
               }}
               animate={{
                 opacity: 1,
                 y: 0,
                 scale: 1,
-                width: isExpanded ? 580 : 420,
-                height: isExpanded ? 760 : 580,
+                width: panelWidth,
+                height: panelHeight,
               }}
               exit={{
                 opacity: 0,
-                y: 20,
+                y: 8,
                 scale: 0.96,
                 transition: { duration: 0.2, ease: [0.2, 0, 0, 1] },
               }}
-              transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
-              className="relative flex flex-col rounded-[32px] w-[420px] max-w-[calc(100vw-3rem)] h-[580px] max-h-[calc(100vh-5rem)] liquid-glass-siri overflow-hidden antialiased text-white"
+              transition={reduceMotion ? { duration: 0 } : { type: 'spring', duration: 0.3, bounce: 0 }}
+              className={`studio-ai-panel studio-ai-panel__surface relative flex min-h-0 w-full max-w-full flex-col overflow-hidden antialiased ${isCompact ? 'rounded-[20px]' : 'rounded-[24px]'}`}
             >
-              {/* 1px Specular Top Highlight */}
-              <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none" />
-
-              {/* ── Top Bar with Circular Controls ── */}
-              <header className="flex h-14 shrink-0 items-center justify-between px-4 border-b border-white/[0.08] bg-white/[0.03]">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-8 w-8 items-center justify-center shrink-0">
-                    <ThinkingOrb
-                      size={20}
-                      state={ai.isGenerating ? 'solving' : 'breathing'}
-                      theme="dark"
-                    />
+              <GenerationGlow active={ai.isGenerating || ai.isMakingReal} />
+              <header className="studio-ai-header flex shrink-0 items-center justify-between gap-3">
+                <div className="studio-ai-header__identity flex items-center gap-3 min-w-0">
+                  <div className="studio-ai-mark flex h-8 w-8 items-center justify-center shrink-0">
+                    {ai.isGenerating ? <AIOrb active /> : <CalmAIIcon size={20} />}
                   </div>
-                  <div className="min-w-0">
-                    <h2 className="font-semibold text-xs text-white tracking-wide truncate">
-                      Spatial Intelligence
+                  <div className="studio-ai-header__copy min-w-0">
+                    <h2 className="font-semibold text-sm tracking-wide truncate">
+                      Ask AI
                     </h2>
-                    <p className="text-[10px] text-white/50 font-mono tabular-nums truncate tracking-tight">
-                      {ai.activeModel}
+                    <p className="studio-ai-provider-line text-xs text-slate-400 truncate tracking-tight">
+                      {ai.provider} · {ai.activeModel}
                     </p>
                   </div>
                 </div>
 
                 {/* Circular Top Controls (Touch Targets >= 40x40px, Scale 0.96) */}
-                <div className="flex items-center gap-1">
+                <div className="studio-ai-header__controls flex items-center gap-1">
                   {/* New Chat Button */}
                   <button
                     type="button"
                     onClick={handleNewChat}
                     title="Start New Chat"
-                    className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 active:scale-[0.96] transition-all"
+                    aria-label="Start new chat"
+                    className="studio-ai-header__utility min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 active:scale-[0.96] transition-[color,background-color,border-color,opacity,transform]"
                   >
                     <SquarePen className="h-4 w-4" strokeWidth={1.5} />
                   </button>
 
-                  {/* Settings Toggle Button */}
+                  {/* Shared provider setup */}
                   <button
                     type="button"
-                    onClick={() => setShowSettings(!showSettings)}
-                    title="Model & Key Settings"
-                    className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full active:scale-[0.96] transition-all ${
-                      showSettings
-                        ? 'text-white bg-white/15'
-                        : 'text-white/70 hover:text-white hover:bg-white/10'
-                    }`}
+                    onClick={() => setShowProviderSetup(true)}
+                    title="AI provider settings"
+                    aria-label="AI provider settings"
+                    className="studio-ai-header__utility min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 active:scale-[0.96] transition-transform"
                   >
-                    <Sliders className="h-4 w-4" strokeWidth={1.5} />
+                    <KeyRound className="h-4 w-4" strokeWidth={1.5} />
                   </button>
 
                   {/* Expand / Collapse Button */}
@@ -773,7 +1000,9 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                     type="button"
                     onClick={() => setIsExpanded(!isExpanded)}
                     title={isExpanded ? 'Collapse size' : 'Expand size'}
-                    className="min-w-[40px] min-h-[40px] hidden sm:flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 active:scale-[0.96] transition-all"
+                    aria-label={isExpanded ? 'Collapse panel' : 'Expand panel'}
+                    aria-pressed={isExpanded}
+                    className="studio-ai-header__primary min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 active:scale-[0.96] transition-[color,background-color,border-color,opacity,transform]"
                   >
                     {isExpanded ? (
                       <Minimize2 className="h-4 w-4" strokeWidth={1.5} />
@@ -786,151 +1015,29 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                   <button
                     type="button"
                     onClick={() => setIsOpen(false)}
-                    title="Close Spatial AI"
-                    className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 active:scale-[0.96] transition-all"
+                    title="Close Ask AI"
+                    aria-label="Close Ask AI"
+                    className="studio-ai-header__primary studio-ai-header__dismiss min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 active:scale-[0.96] transition-[color,background-color,border-color,opacity,transform]"
                   >
                     <X className="h-4 w-4" strokeWidth={1.5} />
                   </button>
                 </div>
               </header>
-
-              {/* ── Settings Drawer (When Activated) ── */}
-              <AnimatePresence>
-                {showSettings && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="border-b border-white/[0.08] bg-white/[0.03] backdrop-blur-3xl p-4 text-xs overflow-hidden"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-semibold text-white/90">
-                        Inference Provider
-                      </span>
-                      <div className="flex rounded-full bg-white/5 p-0.5 border border-white/10">
-                        <button
-                          type="button"
-                          onClick={() => ai.setProvider('gemini')}
-                          className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all active:scale-[0.96] ${
-                            ai.provider === 'gemini'
-                              ? 'bg-white/20 text-white shadow-sm'
-                              : 'text-white/50 hover:text-white'
-                          }`}
-                        >
-                          Gemini
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => ai.setProvider('openrouter')}
-                          className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all active:scale-[0.96] ${
-                            ai.provider === 'openrouter'
-                              ? 'bg-white/20 text-white shadow-sm'
-                              : 'text-white/50 hover:text-white'
-                          }`}
-                        >
-                          OpenRouter
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Model Quick Select Presets */}
-                    {ai.provider === 'gemini' && (
-                      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                        {['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-4-argon'].map((preset) => (
-                          <button
-                            key={preset}
-                            type="button"
-                            onClick={() => {
-                              setModelInput(preset);
-                              ai.setGeminiModel(preset);
-                            }}
-                            className={`text-[10px] px-2.5 py-1 rounded-full font-mono border transition-all active:scale-[0.96] ${
-                              ai.activeModel === preset
-                                ? 'bg-indigo-500/25 border-indigo-400/40 text-indigo-200'
-                                : 'bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10'
-                            }`}
-                          >
-                            {preset}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Active Model Customizer */}
-                    <form
-                      onSubmit={handleSaveModel}
-                      className="mb-3 flex gap-2"
-                    >
-                      <input
-                        type="text"
-                        value={modelInput}
-                        onChange={(e) => setModelInput(e.target.value)}
-                        placeholder="Model identifier..."
-                        className="flex-1 min-h-[40px] rounded-xl bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-white font-mono placeholder-white/30 outline-none focus:border-white/30"
-                      />
-                      <button
-                        type="submit"
-                        className="min-h-[40px] px-3.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-[0.96] text-white text-xs font-medium border border-white/10 transition-all"
-                      >
-                        Save
-                      </button>
-                    </form>
-
-                    <p className="text-xs text-white/70 mb-2">
-                      Keys added here are saved in this browser. Private
-                      deployments can use server environment keys.
-                    </p>
-                    {/* Key Management */}
-                    <div className="space-y-1.5 max-h-28 overflow-y-auto custom-card-scrollbar">
-                      {activeKeys.map((k) => (
-                        <div
-                          key={k}
-                          className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[11px] font-mono text-white/70"
-                        >
-                          <span>{maskApiKey(k)}</span>
-                          <button
-                            type="button"
-                            aria-label="Remove API key"
-                            onClick={() => handleRemoveKey(k)}
-                            className="min-w-[40px] min-h-[40px] w-10 h-10 flex items-center justify-center rounded-lg text-white/40 hover:text-rose-400 hover:bg-white/10 active:scale-[0.96] transition-all p-1"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    {isAddingKey ? (
-                      <form onSubmit={handleAddKey} className="mt-2 flex gap-2">
-                        <input
-                          type="password"
-                          value={newKeyInput}
-                          onChange={(e) => setNewKeyInput(e.target.value)}
-                          aria-label="API key"
-                          placeholder="Paste API Key..."
-                          className="flex-1 min-h-[40px] rounded-xl bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-white font-mono outline-none"
-                        />
-                        <button
-                          type="submit"
-                          className="min-h-[40px] px-3.5 rounded-xl bg-white/15 hover:bg-white/25 active:scale-[0.96] text-white text-xs font-medium transition-all"
-                        >
-                          Add
-                        </button>
-                      </form>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingKey(true)}
-                        className="mt-2 min-h-[40px] px-2.5 rounded-xl text-[11px] text-white/50 hover:text-white hover:bg-white/5 flex items-center gap-1 transition-all active:scale-[0.96]"
-                      >
-                        <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
-                        <span>Add API Key</span>
-                      </button>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <div className="studio-ai-options">
+                <button type="button" className="studio-ai-scope-button" aria-expanded={showContextExplanation} onClick={() => setShowContextExplanation(value => !value)}>
+                  <Layers size={15} aria-hidden="true" />
+                  {ai.groundedContext.selectedCount > 0 ? `${ai.groundedContext.selectedCount} selected` : 'Canvas context'}
+                  <ChevronDown size={13} aria-hidden="true" />
+                </button>
+                <label className="studio-ai-response-style">
+                  <Brain size={15} aria-hidden="true" />
+                  <select aria-label="Response style" value={ai.thinkingMode ? 'reasoned' : 'quick'} onChange={event => ai.setThinkingMode(event.target.value === 'reasoned')}>
+                    <option value="quick">Quick response</option>
+                    <option value="reasoned">Deep reasoning</option>
+                  </select>
+                </label>
+                {showContextExplanation && <p className="studio-ai-scope-details">Requests can include selected objects, nearby visible canvas content, and a visual snapshot when available.</p>}
+              </div>
 
               {/* ── Scrollable Chat Content ── */}
               {ai.storageWarning && (
@@ -941,33 +1048,32 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
               <div
                 ref={chatScrollRef}
                 onScroll={handleScroll}
-                className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 custom-card-scrollbar select-text"
+                className="studio-ai-transcript visionos-ai-chat-scroll flex-1 min-h-0 overflow-y-auto p-4 space-y-4 custom-card-scrollbar select-text"
               >
                 {/* Empty State: Quick Prompt Starters */}
-                {ai.messages.length === 0 && (
-                  <div className="flex flex-col items-center justify-center min-h-[300px] text-center p-4 gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center">
-                      <ThinkingOrb size={64} state="breathing" theme="dark" />
+                {conversationMessages.length === 0 && (
+                  <div className="studio-ai-empty flex flex-col items-center justify-center min-h-[300px] text-center p-4 gap-4">
+                    <div className="studio-ai-empty__symbol flex h-12 w-12 items-center justify-center">
+                      <AIOrb size={64} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-sm text-white">
-                        How can I help you create?
+                      <h3 className="studio-ai-empty__title font-semibold text-sm text-white">
+                        What would you like to create?
                       </h3>
-                      <p className="text-xs text-white/50 mt-1 max-w-[280px]">
-                        VisionOS Spatial Intelligence generates shapes, apps,
-                        and documents right on your canvas.
+                      <p className="studio-ai-empty__description text-xs text-white/50 mt-1 max-w-[280px]">
+                        Choose a starter to fill the prompt. Select Send when ready.
                       </p>
                     </div>
 
                     <div className="w-full space-y-2 mt-2">
-                      {quickStarters.map((item, idx) => {
+                      {quickStarters.slice(0, 2).map((item, idx) => {
                         const Icon = item.icon;
                         return (
                           <button
                             key={idx}
                             type="button"
                             onClick={() => handleActionPreset(item.prompt)}
-                            className="w-full flex items-center gap-2.5 p-3 rounded-[24px] bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.96] border border-white/[0.08] text-left transition-all group"
+                            className="studio-ai-starter w-full flex items-center gap-2.5 p-3 rounded-[24px] bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.96] border border-white/[0.08] text-left transition-[color,background-color,border-color,opacity,transform] group"
                           >
                             <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-white/10 text-white shrink-0">
                               <Icon className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -983,27 +1089,26 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                 )}
 
                 {/* Message List */}
-                {ai.messages.map((msg) => (
+                {conversationMessages.map((msg) => (
                   <div
                     key={msg.id}
                     className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} gap-1`}
                   >
                     {msg.role === 'user' ? (
-                      <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-white/15 border border-white/10 px-4 py-3 text-xs leading-relaxed text-white shadow-md">
+                      <div className="studio-ai-message studio-ai-message--user max-w-[85%] rounded-2xl rounded-tr-sm bg-white/15 border border-white/10 px-4 py-3 text-xs leading-relaxed text-white shadow-md">
                         {msg.content}
+                        {!ai.isGenerating && <button type="button" className="mt-2 block min-h-[44px] text-sm underline underline-offset-4" onClick={() => { setInputText(msg.content); inputRef.current?.focus(); }}>Edit prompt</button>}
                       </div>
                     ) : (
-                      <div className="w-full rounded-2xl bg-white/[0.04] border border-white/10 p-4 text-xs text-white/90 shadow-md">
+                      <div className="studio-ai-message studio-ai-message--assistant w-full">
                         {/* Assistant Header */}
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="studio-ai-message__header flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <ThinkingOrb
-                              size={20}
-                              state={msg.isStreaming ? 'solving' : 'breathing'}
-                              theme="dark"
-                            />
-                            <span className="font-semibold text-[11px] text-white">
-                              Spatial Intelligence
+                            {msg.isStreaming
+                              ? <AIOrb active />
+                              : <CalmAIIcon size={18} />}
+                            <span className="studio-ai-message__label font-semibold">
+                              Assistant
                             </span>
                           </div>
                           <CopyMessageButton text={msg.content} />
@@ -1018,24 +1123,15 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                           />
                         )}
 
-                        {/* Rotating thinking state when streaming before content arrives */}
+                        {/* Show the actual request phase while the first response chunk arrives. */}
                         {msg.isStreaming &&
                           (!msg.content || msg.content.trim().length === 0) &&
-                          !msg.thought && <VisionRotatingThinkingIndicator />}
-
-                        {/* Swarm DAG Plan if present */}
-                        {(msg.dagPlan ||
-                          (msg.dagNodes && msg.dagNodes.length > 0)) && (
-                          <VisionDAGPlanTree
-                            plan={msg.dagPlan}
-                            nodes={msg.dagNodes}
-                          />
-                        )}
+                          !msg.thought && <ResponseLoadingIndicator />}
 
                         {/* Message Markdown Content */}
                         {msg.content && msg.content.trim().length > 0 && (
                           <div
-                            className="rich-card-prose prose prose-invert prose-sm max-w-none text-xs leading-relaxed"
+                            className="studio-ai-message__content rich-card-prose prose prose-invert prose-sm max-w-none text-xs leading-relaxed"
                             dangerouslySetInnerHTML={{
                               __html: renderChatMarkdownWithKaTeX(msg.content),
                             }}
@@ -1045,7 +1141,7 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                         {/* Executed Action Badges (Apple Liquid Glass Pills) */}
                         {msg.executedActions &&
                           msg.executedActions.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-3 pt-2.5 border-t border-white/[0.08]">
+                            <div className="studio-ai-message__actions flex flex-wrap gap-1.5 mt-3 pt-2.5 border-t border-white/[0.08]">
                               {msg.executedActions.map((act, i) => (
                                 <button
                                   type="button"
@@ -1058,7 +1154,7 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                                   }}
                                   title="Show affected element on canvas"
                                   key={i}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 active:scale-[0.96] text-[11px] text-white/80 font-medium transition-all"
+                                  className="studio-ai-message__action inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 active:scale-[0.96] text-[11px] text-white/80 font-medium transition-[color,background-color,border-color,opacity,transform]"
                                 >
                                   <span className="text-cyan-400">✦</span>
                                   <span>{formatDisplayActionBadge(act.actionSummary)}</span>
@@ -1084,56 +1180,48 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
               {/* ── Bottom Input & Intelligence Controls ── */}
               <div
                 ref={actionMenuRef}
-                className="relative border-t border-white/[0.08] bg-white/[0.02] p-3 space-y-2"
+                className="studio-ai-footer relative space-y-2"
               >
-                {/* ── Intelligence Toggles: Thinking & Swarm ── */}
-                <div className="flex items-center gap-1.5 px-1">
-                  {/* Thinking Mode Pill */}
-                  <button
-                    type="button"
-                    onClick={() => ai.setThinkingMode(!ai.thinkingMode)}
-                    title={
-                      ai.thinkingMode
-                        ? 'Deep reasoning enabled'
-                        : 'Standard fast inference'
-                    }
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all active:scale-[0.96] ${
-                      ai.thinkingMode
-                        ? 'bg-white/15 text-white border-white/25 shadow-sm'
-                        : 'bg-white/[0.03] text-white/50 hover:text-white/80 border-white/[0.08] hover:bg-white/[0.06]'
-                    }`}
-                  >
-                    <Brain
-                      className={`h-3 w-3 ${ai.thinkingMode ? 'text-cyan-300' : 'text-white/40'}`}
-                      strokeWidth={1.5}
-                    />
-                    <span>Thinking</span>
-                  </button>
-
-                  {/* Swarm (Coming Soon) */}
-                  <div
-                    title="Swarm (Multi-Agent Specialist Collaboration) is coming soon in an upcoming visionOS update"
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-white/[0.03] text-white/40 border border-white/[0.06] cursor-not-allowed select-none"
-                  >
-                    <Network
-                      className="h-3 w-3 text-white/30"
-                      strokeWidth={1.5}
-                    />
-                    <span>Swarm</span>
-                    <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-indigo-500/15 text-indigo-300/80 border border-indigo-500/20 font-medium ml-0.5">Soon</span>
-                  </div>
-                </div>
-
+                {providerSaveNotice && (
+                  <p className="studio-provider-status mx-1" role="status">
+                    {providerSaveNotice}
+                  </p>
+                )}
                 {/* ── Action Menu Popover (When + is Pressed) ── */}
                 <AnimatePresence>
                   {showActionMenu && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute bottom-20 left-4 z-50 w-72 rounded-[20px] bg-[rgba(24,24,32,0.95)] backdrop-blur-3xl border border-white/10 p-2 shadow-2xl space-y-1"
+                      exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: 10, scale: 0.95 }}
+                      transition={reduceMotion ? { duration: 0 } : { duration: 0.15 }}
+                      id="studio-ai-actions-menu"
+                      aria-label="Chat actions and prompt starters"
+                      className="studio-ai-menu absolute bottom-20 left-4 z-50 w-72 rounded-[20px] bg-[rgba(24,24,32,0.95)] backdrop-blur-3xl border border-white/10 p-2 shadow-2xl space-y-1"
                     >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleNewChat();
+                          setShowActionMenu(false);
+                        }}
+                        className="studio-ai-menu__utility w-full flex items-center gap-2.5 min-h-[44px] px-3 py-2.5 rounded-xl text-left text-sm font-medium"
+                      >
+                        <SquarePen className="h-4 w-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+                        <span>Start a new chat</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowProviderSetup(true);
+                          setShowActionMenu(false);
+                        }}
+                        className="studio-ai-menu__utility w-full flex items-center gap-2.5 min-h-[44px] px-3 py-2.5 rounded-xl text-left text-sm font-medium"
+                      >
+                        <KeyRound className="h-4 w-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+                        <span>Provider settings</span>
+                      </button>
+                      <div className="studio-ai-menu__divider" aria-hidden="true" />
                       {quickStarters.map((item, idx) => {
                         const Icon = item.icon;
                         return (
@@ -1141,7 +1229,7 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                             key={idx}
                             type="button"
                             onClick={() => handleActionPreset(item.prompt)}
-                            className="w-full flex items-center gap-2.5 min-h-[40px] px-3 py-2.5 rounded-xl text-left text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white active:scale-[0.96] transition-all"
+                            className="studio-ai-menu__starter w-full flex items-center gap-2.5 min-h-[44px] px-3 py-2.5 rounded-xl text-left text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white active:scale-[0.96] transition-[color,background-color,border-color,opacity,transform]"
                           >
                             <Icon
                               className="h-4 w-4 text-white/60 shrink-0"
@@ -1155,39 +1243,38 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                   )}
                 </AnimatePresence>
 
-                {/* ── Bottom Floating Input Pill (visionOS Style) ── */}
-                <BorderBeam
-                  size="line"
-                  active={ai.isGenerating}
-                  className="w-full rounded-full"
-                >
-                  <form
+                <form
                     onSubmit={handleSubmit}
-                    className="flex items-center gap-1.5 w-full rounded-full bg-white/[0.08] border border-white/10 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] backdrop-blur-2xl transition-colors focus-within:border-white/30"
+                    className="studio-ai-composer flex items-end w-full"
                   >
                     {/* Action Menu (+) Button (Touch target >= 40x40px, Scale 0.96) */}
                     <button
                       type="button"
                       onClick={() => setShowActionMenu(!showActionMenu)}
                       title="Quick Action Presets"
-                      className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 active:scale-[0.96] transition-all shrink-0"
+                      aria-label="Open chat actions and prompt starters"
+                      aria-expanded={showActionMenu}
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 active:scale-[0.96] transition-[color,background-color,border-color,opacity,transform] shrink-0"
                     >
                       <Plus className="h-4 w-4" strokeWidth={1.5} />
                     </button>
 
-                    {/* Pill Text Input */}
-                    <input
+                    <textarea
                       ref={inputRef}
-                      type="text"
+                      rows={1}
                       value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
+                      onChange={handlePromptInputChange}
+                      onSelect={handlePromptSelectionChange}
+                      onKeyDown={handlePromptKeyDown}
                       placeholder={
                         ai.groundedContext.selectedCount > 0
-                          ? `Ask AI about selected shapes, 'Make Real'..."`
-                          : 'Ask visionOS Spatial AI...'
+                          ? 'Ask AI about the selected objects…'
+                          : 'Ask AI about this canvas…'
                       }
                       disabled={ai.isGenerating || ai.isMakingReal}
-                      className="flex-1 bg-transparent px-2 text-xs text-white placeholder-white/40 !outline-none font-sans"
+                      className="max-h-40 min-h-[44px] flex-1 resize-y bg-transparent px-2 py-3 text-base leading-6 text-white placeholder-white/55 !outline-none font-sans"
+                      aria-label="Ask AI"
+                      aria-describedby="studio-ai-send-hint"
                     />
 
                     {/* Voice Dictation Button with VoiceBeam */}
@@ -1195,10 +1282,11 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                       <button
                         type="button"
                         onClick={toggleVoice}
+                        aria-label={isMicLive ? 'Stop voice input' : 'Start voice input'}
                         title={
                           isMicLive ? 'Stop microphone' : 'Start voice input'
                         }
-                        className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full transition-all active:scale-[0.96] shrink-0 ${
+                        className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-[color,background-color,border-color,opacity,transform] active:scale-[0.96] shrink-0 ${
                           isMicLive
                             ? 'bg-rose-500/30 text-rose-300 border border-rose-500/40'
                             : 'text-white/60 hover:text-white hover:bg-white/10'
@@ -1222,7 +1310,7 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                         onClick={ai.stopGeneration}
                         title="Stop generation"
                         aria-label="Stop generation"
-                        className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full bg-rose-600 hover:bg-rose-500 text-white active:scale-[0.96] transition-all shrink-0"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-rose-600 hover:bg-rose-500 text-white active:scale-[0.96] transition-[color,background-color,border-color,opacity,transform] shrink-0"
                       >
                         <Square
                           className="h-4 w-4 fill-current"
@@ -1235,18 +1323,32 @@ export const SpatialAIOmnibar: React.FC<SpatialAIOmnibarProps> = ({ ai }) => {
                         disabled={!inputText.trim()}
                         title="Send prompt"
                         aria-label="Send prompt"
-                        className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full bg-white text-black hover:bg-white/90 disabled:bg-white/10 disabled:text-white/30 active:scale-[0.96] transition-all shadow-md shrink-0"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white text-black hover:bg-white/90 disabled:bg-white/10 disabled:text-white/30 active:scale-[0.96] transition-[color,background-color,border-color,opacity,transform] shadow-md shrink-0"
                       >
                         <Send className="h-4 w-4" strokeWidth={2.0} />
                       </button>
                     )}
-                  </form>
-                </BorderBeam>
+                    <span id="studio-ai-send-hint" className="sr-only">
+                      Press Enter to send, or Shift and Enter for a new line. Prompts are only sent when you choose Send.
+                    </span>
+                </form>
               </div>
             </motion.div>
-          </aside>
-        )}
-      </AnimatePresence>
+          </motion.aside>,
+        document.body
+      )}
+      <ProviderSetup
+        isOpen={active && showProviderSetup}
+        onClose={() => setShowProviderSetup(false)}
+        onSaved={(detail) => {
+          const storage = detail.persistenceStatus === 'persistent'
+            ? 'Keys are saved in this browser.'
+            : detail.persistenceStatus === 'session'
+              ? 'Keys are available in this tab session.'
+              : 'Keys are held in memory until this page closes.';
+          setProviderSaveNotice(`Provider settings saved. The key was not checked. ${storage}`);
+        }}
+      />
     </>
   );
 };

@@ -142,7 +142,7 @@ describe('API Route Schemas & Error Handling Suite (src/test/routes.test.ts)', (
   // 3. /api/ai/spatial-stream Route Testing
   // =========================================================================
   describe('Spatial Stream API Route (/api/ai/spatial-stream)', () => {
-    it('returns 500 when culledContext is missing from request body', async () => {
+    it('returns 400 when culledContext is missing from request body', async () => {
       const req = new NextRequest(
         'http://localhost:3000/api/ai/spatial-stream',
         {
@@ -153,7 +153,7 @@ describe('API Route Schemas & Error Handling Suite (src/test/routes.test.ts)', (
       );
 
       const res = await spatialStreamPost(req);
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(400);
 
       const data = await res.json();
       expect(data.error).toBeTruthy();

@@ -1,21 +1,31 @@
 import { NextRequest } from 'next/server';
 import type { AISpatialStreamRequest, SpatialActionFrame } from '@/types/spatial';
+import {
+  readBoundedJson,
+  RequestBodyTooLargeError,
+  RequestValidationError,
+  validateSpatialStreamRequest,
+} from '@/lib/ai/request';
 
 export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
   try {
-    const body: AISpatialStreamRequest = await req.json();
+    const parsed = await readBoundedJson(req);
+    validateSpatialStreamRequest(parsed);
+    const body: AISpatialStreamRequest = parsed;
     const { intent, prompt, culledContext } = body;
 
     const encoder = new TextEncoder();
     const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const selectedIds = culledContext.selectedNodes.map((n) => n.id);
+    let cancelled = false;
 
     const stream = new ReadableStream({
       async start(controller) {
         const send = (frame: SpatialActionFrame) => {
+          if (cancelled) return;
           controller.enqueue(encoder.encode(JSON.stringify(frame) + '\n'));
         };
 
@@ -30,6 +40,7 @@ export async function POST(req: NextRequest) {
               margin: 36,
             });
             await delay(100);
+            if (cancelled) return;
 
             // Repel collisions around first node
             send({
@@ -39,6 +50,7 @@ export async function POST(req: NextRequest) {
               margin: 48,
             });
             await delay(80);
+            if (cancelled) return;
 
             // Create organizing frame
             send({
@@ -53,6 +65,7 @@ export async function POST(req: NextRequest) {
           // Connect Flow between selected nodes
           if (selectedIds.length >= 2) {
             for (let i = 0; i < selectedIds.length - 1; i++) {
+              if (cancelled) return;
               send({
                 t: 'patch',
                 op: 'connect',
@@ -98,7 +111,10 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        controller.close();
+        if (!cancelled) controller.close();
+      },
+      cancel() {
+        cancelled = true;
       },
     });
 
@@ -111,8 +127,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
+    const status =
+      err instanceof RequestBodyTooLargeError
+        ? 413
+        : errorMsg === 'Invalid JSON request.' || err instanceof RequestValidationError
+          ? 400
+          : 500;
     return new Response(JSON.stringify({ error: errorMsg }), {
-      status: 500,
+      status,
       headers: { 'Content-Type': 'application/json' },
     });
   }

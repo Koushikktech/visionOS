@@ -1,0 +1,14 @@
+[
+  {
+    "engine": "chromium",
+    "appearanceAndBounds": true,
+    "noSilentSend": true,
+    "errors": []
+  },
+  {
+    "engine": "webkit",
+    "appearanceAndBounds": true,
+    "noSilentSend": true,
+    "errors": []
+  }
+]

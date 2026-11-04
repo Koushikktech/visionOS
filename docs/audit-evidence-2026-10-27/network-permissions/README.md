@@ -1,0 +1,28 @@
+# Local app website permissions — 27 October 2026
+
+This checkpoint follows the earlier Oct 27 429-test implementation pass. No separate product server or execution service was added. Apps execute in the browser inside a trusted local wrapper and a nested opaque-origin Blob-backed frame. The permission store belongs to the host browser and is excluded from workspace backups.
+
+## Verification
+
+- **454 tests passed, 0 failures, 48 files**: [test log](tests.txt). [Typecheck](typecheck.txt), [production build](build.txt) and final diff check passed.
+- The real production UI flow passed in **Chromium and headless WebKit**: [harness](permissions-e2e.cjs), [results](permissions-results.json). It verified ignored legacy broad grants, exact-origin approval, continued denial of a second origin, external-link host confirmation with an opener-free popup, remembered permission after reload, revocation, and source-change revocation. The source-change test first regranted a remembered permission, confirmed the approved request worked, then changed the source and confirmed denial.
+- The app intentionally delayed its virtual-storage snapshot by 30 seconds, changed its count from 3 to 4, then approved website access. The flush handshake captured the pending count, accepted it into the board, awaited durable storage, and the reloaded app displayed 4 in both engines.
+- Chromium's UI flow also blocked an approved-endpoint HTTP 302 redirect to an unapproved endpoint. WebKit's Playwright adapter rejects synthetic 302 responses, so that UI-harness field is false for WebKit (not a failed redirect policy). A separate test-only real HTTPS loopback server exercised a real 302 in WebKit: the approved response loaded and the unapproved redirect destination never reached the fixture route.
+- **Unavailable app-storage database, Chromium at 320×568**: [harness](storage-unavailable.cjs), [result](storage-unavailable-results.json). The user first explicitly ran with board-saved data. Website access stayed unchanged after failed durable confirmation; a second explicit reload choice retained the latest validated app count 4 and enabled session access. The dialog stayed in bounds. After its entrance animation, the unscaled selection-toolbar action measured exactly **44×44 physical CSS pixels** at canvas zoom 33%.
+- **Cross-tab revocation, Chromium**: [harness](cross-tab-revocation.cjs). Two tabs shared the same board, shape, source and epoch. A remembered approval from A worked in B; revocation in A caused B to pause and detach its iframe. Its request count remained unchanged for the observed 1.2 seconds. No unapproved requests or page errors were observed.
+
+## Behavior
+
+Website access is reviewed as exact HTTPS origins, including ports; matching secure WebSocket connections are covered. There are no wildcard/global HTTPS grants. Blocked requests coalesce into an inline review notice; they do not automatically open dialogs. The dialog offers session access and optional remembering for this code version, with less common controls under Advanced access. Unscaled access is available from the selection toolbar when the canvas is zoomed out, including for locked app selections so access can be revoked.
+
+Code edits invalidate grants, duplicates have a different shape identity, and imports/restore use a new workspace epoch and remain paused. Approval waits for a correlated snapshot from the current runtime and durable confirmation before reloading. Storage failure requires an explicit fallback; revocation stops access even if app data cannot be confirmed. HTTPS anchor clicks request an explicit host-side Open link action; they do not automatically navigate the app or open a tab. Forms and remote embedded frames remain restricted. Sites can still refuse browser cross-origin requests.
+
+## Security boundary and limitations
+
+Both browser engines were tested with an app document that has no global CSP, a sandboxed trusted wrapper containing its own CSP, and a sandboxed generated child. Approved requests worked. Disallowed fetches, direct external self-navigation and tested redirect paths did not reach the unapproved network route. Bridge tests covered storage pending/sync/flush, source/token rejection, pinch forwarding, origin-only request hints, external links and feature notices. No real AI provider or credentials were used. Fixtures intercepted reserved test domains; SDK CDN asset loading remains part of the existing application.
+
+**This is not a complete network firewall for hostile code.** WebKit allowed an app-created nested srcdoc to expose native RTCPeerConnection despite the main runtime guard. A test constructed it with no ICE servers, created a data channel and generated an offer; it did not set a local description or establish a connection. The Advanced peer API control is best-effort and explicitly discloses this limitation. HTTPS/WSS permissions and wrapper navigation enforcement must not be presented as control over every browser transport.
+
+These are isolated desktop engine checks, not the Safari application, physical iPad, Pencil, VoiceOver, microphone, deployment or universal third-party API compatibility certification. Swarm remains excluded. Harnesses use the cached Playwright paths in their source; adjust those paths for another machine.
+
+Boundary diagnostic harnesses from the delegated verification: [wrapper/runtime](visionos-boundary-wrapper-e2e.ts), [real redirect](visionos-boundary-redirect-e2e.ts), [nested-global probe](visionos-boundary-e2e-nested.ts). Their results above were reported by the verification agent; these scripts use local fixture/runtime paths that may need adjustment. No blocked file:// fixture is used by the product or final application checks.

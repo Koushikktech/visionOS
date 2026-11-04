@@ -1,0 +1,16 @@
+$ tsc --noEmit
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-e2e-nested.ts(2,37): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-e2e-nested.ts(3,45): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-e2e-nested.ts(68,45): error TS2339: Property '__events' does not exist on type 'Window & typeof globalThis'.
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-e2e-nested.ts(70,52): error TS2339: Property 'contentWindow' does not exist on type 'HTMLElement'.
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-e2e-nested.ts(75,53): error TS2339: Property '__events' does not exist on type 'Window & typeof globalThis'.
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-redirect-e2e.ts(4,37): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-redirect-e2e.ts(5,45): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-redirect-e2e.ts(54,53): error TS2339: Property '__events' does not exist on type 'Window & typeof globalThis'.
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-wrapper-e2e.ts(1,45): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-wrapper-e2e.ts(2,34): error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-wrapper-e2e.ts(23,1078): error TS2339: Property 'contentWindow' does not exist on type 'HTMLElement'.
+docs/audit-evidence-2026-10-27/network-permissions/visionos-boundary-wrapper-e2e.ts(23,1292): error TS2339: Property '__events' does not exist on type 'Window & typeof globalThis'.
+src/app/api/ai/make-real/route.ts(265,43): error TS2345: Argument of type '"OpenRouter" | "OpenAI"' is not assignable to parameter of type '"Gemini" | "OpenRouter"'.
+  Type '"OpenAI"' is not assignable to type '"Gemini" | "OpenRouter"'.
+src/test/dashboardAndChatGPT.test.ts(103,18): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.

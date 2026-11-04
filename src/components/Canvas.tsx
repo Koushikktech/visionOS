@@ -1,11 +1,14 @@
 'use client';
 
-import { Tldraw, Editor } from '@tldraw/tldraw';
-import { useCallback, useState, useEffect } from 'react';
+import { Tldraw, Editor, PageRecordType } from '@tldraw/tldraw';
+import { useCallback, useState, useEffect, useRef } from 'react';
+import { MotionConfig } from 'framer-motion';
 import { useSpatialWorker } from '../hooks/useSpatialWorker';
 import { useSpatialAI } from '../hooks/useSpatialAI';
+import { useBoardRecovery } from '../hooks/useBoardRecovery';
 import { customShapeUtils } from '../shapes';
 import { initPanModifierTracking, isSpacePanHeld } from '../lib/panModifier';
+import { readLocalStorage, writeLocalStorage } from '../lib/browserStorage';
 import { ContextualFormattingPill } from './ContextualFormattingPill';
 import { AppleFloatingDock } from './AppleFloatingDock';
 import { AppleViewportPill } from './AppleViewportPill';
@@ -13,34 +16,114 @@ import { ApplePagesPill } from './ApplePagesPill';
 import { SpatialAIOmnibar } from './SpatialAIOmnibar';
 import { AIAgentCursor } from './AIAgentCursor';
 import { SpeculativeSkeletonOverlay } from './SpeculativeSkeletonOverlay';
-import { VisionOnboardingModal } from './VisionOnboardingModal';
+import { captureWorkspaceSummary, writeWorkspaceSummary, type WorkspaceLaunchIntent } from '../lib/workspaceStudio';
+import { WorkspaceActivity } from './WorkspaceActivity';
+import { insertStudioExample } from '../lib/studioExamples';
+import { runEditorOperationSafely } from '../lib/editorOperation';
+import { getCanvasTouchAction, shouldRoutePinchToCanvas } from '../lib/canvasGesturePolicy';
 
-export default function Canvas() {
+export interface CanvasProps {
+  active?: boolean;
+  onGoToDashboard?: () => void;
+  launchIntent?: WorkspaceLaunchIntent;
+  onIntentConsumed?: (id: string) => void;
+}
+
+let sessionHintDismissed = false;
+
+export default function Canvas({ active = true, onGoToDashboard, launchIntent, onIntentConsumed }: CanvasProps = {}) {
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+  const [launchError, setLaunchError] = useState('');
+  const [retry, setRetry] = useState(0);
+  const [composerDraft, setComposerDraft] = useState<{id: string; text: string}>();
+  const [backupsRequest, setBackupsRequest] = useState<string>();
   const spatial = useSpatialWorker(editor);
   const ai = useSpatialAI(editor, spatial);
+  const recovery = useBoardRecovery(editor);
+  const executed = useRef(new Set<string>());
+  const failedIntent = useRef<string | null>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const onboarded = localStorage.getItem('visionos_onboarded_v1');
-      if (!onboarded) {
-        setShowOnboarding(true);
+    setShowHint(!sessionHintDismissed && !readLocalStorage('visionos_onboarded_v1').value);
+  }, []);
+  const dismissHint = () => {
+    sessionHintDismissed = true;
+    writeLocalStorage('visionos_onboarded_v1', 'true');
+    setShowHint(false);
+  };
+
+  const handleMount = useCallback((instance: Editor) => {
+    instance.updateInstanceState({ isGridMode: true });
+    setEditor(instance);
+  }, []);
+
+  useEffect(() => {
+    if (!editor) return;
+    const syncAppearance = () => {
+      const preference = document.documentElement.dataset.appearance;
+      editor.user.updateUserPreferences({ colorScheme: preference === 'light' || preference === 'dark' ? preference : 'system' });
+    };
+    syncAppearance();
+    window.addEventListener('visionos:appearance-change', syncAppearance);
+    return () => window.removeEventListener('visionos:appearance-change', syncAppearance);
+  }, [editor]);
+
+  useEffect(() => {
+    if (!active || !editor || !launchIntent || executed.current.has(launchIntent.id) || failedIntent.current === launchIntent.id) return;
+    if (recovery.status === 'checking' || recovery.status === 'conflict') return;
+    try {
+      // Restore public viewport geometry after the single editor becomes visible.
+      editor.updateViewportScreenBounds(editor.getContainer(), true);
+      if (launchIntent.kind !== 'open' && editor.getIsReadonly()) throw new Error('This canvas is read-only. Open a writable canvas to continue.');
+      if (launchIntent.kind === 'open' && launchIntent.pageId) {
+        const page = editor.getPages().find((page) => page.id === launchIntent.pageId);
+        if (page) editor.setCurrentPage(page.id);
+      } else if (launchIntent.kind === 'new-page') {
+        const pageId = PageRecordType.createId('studio-' + launchIntent.id);
+        if (!editor.getPages().some((page) => page.id === pageId)) {
+          if (editor.getPages().length >= editor.options.maxPages) throw new Error('The canvas has reached its page limit. Open an existing page to continue.');
+          const mark = editor.markHistoryStoppingPoint('new-studio-page');
+          runEditorOperationSafely(editor, () => {
+            editor.createPage({ id: pageId, name: 'Untitled page' });
+            if (!editor.getPage(pageId)) throw new Error('The page could not be created. Your existing pages are unchanged.');
+            editor.setCurrentPage(pageId);
+          }, mark, { attempted: false });
+        } else editor.setCurrentPage(pageId);
+        editor.setCurrentTool('draw');
+        setShowHint(true);
+      } else if (launchIntent.kind === 'example') {
+        insertStudioExample(editor, launchIntent.example ?? 'field-notes', launchIntent.id);
+        setShowHint(true);
+      } else if (launchIntent.kind === 'draft') {
+        setComposerDraft({ id: launchIntent.id, text: launchIntent.draft ?? '' });
+      } else if (launchIntent.kind === 'restore') {
+        setBackupsRequest(launchIntent.id);
       }
+      executed.current.add(launchIntent.id);
+      onIntentConsumed?.(launchIntent.id);
+      setLaunchError('');
+    } catch (error) {
+      failedIntent.current = launchIntent.id;
+      setLaunchError(error instanceof Error ? error.message : 'Could not open this action. Your canvas is still available.');
     }
-  }, []);
+  }, [active, editor, launchIntent, recovery.status, onIntentConsumed, retry]);
 
-  const handleMount = useCallback((editorInstance: Editor) => {
-    // Enable dotted grid mode and dark color scheme by default
-    editorInstance.updateInstanceState({
-      isGridMode: true,
-    });
-    editorInstance.user.updateUserPreferences({
-      colorScheme: 'dark',
-    });
-
-    setEditor(editorInstance);
-  }, []);
+  // Metadata is a bounded, inert overview of hydrated records, never a save acknowledgement.
+  useEffect(() => {
+    if (!editor || recovery.status === 'checking' || recovery.status === 'conflict') return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const capture = () => {
+      try { writeWorkspaceSummary(captureWorkspaceSummary(editor)); } catch { /* Preview failure cannot affect saving. */ }
+    };
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(capture, 800);
+    };
+    capture();
+    const unlisten = editor.store.listen(schedule, { source: 'all' });
+    return () => { clearTimeout(timer); unlisten(); capture(); };
+  }, [editor, recovery.status]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // GLOBAL IN-CARD WHEEL & TRACKPAD INTERCEPTOR
@@ -68,24 +151,43 @@ export default function Canvas() {
   //    from a fully-read card feels seamless instead of "stuck".
   // ───────────────────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!active) return;
     const cleanupPanTracking = initPanModifierTracking();
 
+    const getGestureTarget = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) {
+        return { insideCanvas: false, insideChrome: false, editable: false };
+      }
+
+      return {
+        insideCanvas: Boolean(target.closest('.tl-canvas')),
+        insideChrome: Boolean(
+          target.closest(
+            '[data-canvas-chrome], [data-visionos-panel="true"], .visionos-hud, .canvasos-hud, [role="dialog"]'
+          )
+        ),
+        editable: Boolean(
+          target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]')
+        ),
+      };
+    };
+
     const handleWheelCapture = (e: WheelEvent) => {
-      // Trackpad pinch-to-zoom (ctrlKey is true on macOS trackpad pinch gestures in Chrome/Safari).
-      // We MUST call preventDefault to stop the browser from zooming the entire page/GUI,
-      // letting tldraw cleanly zoom only the infinite canvas!
+      const hitEl = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+
+      // Reserve trackpad pinch for tldraw only over the drawing surface. Over
+      // controls and editors, preserve browser zoom for readability.
       if (e.ctrlKey) {
-        e.preventDefault();
+        if (shouldRoutePinchToCanvas(getGestureTarget(hitEl))) e.preventDefault();
+        else e.stopPropagation();
         return;
       }
 
       if (e.metaKey || isSpacePanHeld()) return;
-
-      // Real hit-test at the cursor — respects actual visual stacking order,
-      // so a floating panel that visually covers a card always wins, and a
-      // card is only ever a candidate when the cursor is genuinely over it.
-      const hitEl = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
       if (!hitEl) return;
+
+      // Native panes outside the tldraw canvas keep their own wheel handling.
+      if (!hitEl.closest('.tl-canvas')) return;
 
       const scrollable = hitEl.closest<HTMLElement>('[data-scrollable="true"]');
       if (!scrollable) return; // Not over scrollable card content -> let tldraw pan/zoom normally.
@@ -123,34 +225,78 @@ export default function Canvas() {
       if (horizontalIntent) scrollable.scrollLeft += dx;
     };
 
-    // Safari-specific gesture prevention to stop whole-page rubberband / zoom
-    const preventGesture = (e: Event) => {
-      e.preventDefault();
+    // Safari exposes trackpad pinch separately from wheel events. Block page
+    // zoom only over the canvas so browser zoom remains available over chrome
+    // and editor dialogs.
+    const handleGesture = (e: Event) => {
+      if (shouldRoutePinchToCanvas(getGestureTarget(e.target))) e.preventDefault();
+      else e.stopPropagation();
+    };
+
+    // tldraw intentionally sets touch-action:none on its canvas. Before a
+    // touch begins inside a marked content pane, allow the browser's native
+    // one-finger vertical scrolling. Blank canvas gestures remain owned by
+    // tldraw, including pinch zoom.
+    const handleTouchPointerOver = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch' || !(e.target instanceof Element)) return;
+      const canvas = e.target.closest<HTMLElement>('.tl-canvas');
+      if (!canvas) return;
+      canvas.style.touchAction = getCanvasTouchAction(
+        Boolean(e.target.closest('[data-scrollable="true"]'))
+      );
+    };
+
+    const handleTouchPointerOut = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch' || !(e.target instanceof Element)) return;
+      const canvas = e.target.closest<HTMLElement>('.tl-canvas');
+      if (!canvas) return;
+      const currentPane = e.target.closest('[data-scrollable="true"]');
+      const nextTarget = e.relatedTarget instanceof Element ? e.relatedTarget : null;
+      const nextPane = nextTarget?.closest('[data-scrollable="true"]') ?? null;
+      if (currentPane !== nextPane) {
+        canvas.style.touchAction = getCanvasTouchAction(Boolean(nextPane));
+      }
+    };
+
+    const resetTouchAction = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch' || !(e.target instanceof Element)) return;
+      const canvas = e.target.closest<HTMLElement>('.tl-canvas');
+      if (canvas) canvas.style.touchAction = 'none';
     };
 
     window.addEventListener('wheel', handleWheelCapture, {
       capture: true,
       passive: false,
     });
-    window.addEventListener('gesturestart', preventGesture, { passive: false });
-    window.addEventListener('gesturechange', preventGesture, { passive: false });
-    window.addEventListener('gestureend', preventGesture, { passive: false });
+    window.addEventListener('gesturestart', handleGesture, { passive: false });
+    window.addEventListener('gesturechange', handleGesture, { passive: false });
+    window.addEventListener('gestureend', handleGesture, { passive: false });
+    window.addEventListener('pointerover', handleTouchPointerOver, true);
+    window.addEventListener('pointerout', handleTouchPointerOut, true);
+    window.addEventListener('pointerup', resetTouchAction, true);
+    window.addEventListener('pointercancel', resetTouchAction, true);
 
     return () => {
       window.removeEventListener('wheel', handleWheelCapture, {
         capture: true,
       });
-      window.removeEventListener('gesturestart', preventGesture);
-      window.removeEventListener('gesturechange', preventGesture);
-      window.removeEventListener('gestureend', preventGesture);
+      window.removeEventListener('gesturestart', handleGesture);
+      window.removeEventListener('gesturechange', handleGesture);
+      window.removeEventListener('gestureend', handleGesture);
+      window.removeEventListener('pointerover', handleTouchPointerOver, true);
+      window.removeEventListener('pointerout', handleTouchPointerOut, true);
+      window.removeEventListener('pointerup', resetTouchAction, true);
+      window.removeEventListener('pointercancel', resetTouchAction, true);
       cleanupPanTracking();
     };
-  }, []);
+  }, [active]);
 
   // Keyboard controls & Esc hierarchy
   useEffect(() => {
+    if (!active) return;
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
+      if (target?.closest('[role="dialog"][aria-modal="true"]')) return;
       const isEditingText =
         target && (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable);
 
@@ -221,6 +367,7 @@ export default function Canvas() {
             editor.setCurrentTool('hand');
           } else if (key === 'd' || key === 'p') {
             editor.setCurrentTool('draw');
+        setShowHint(true);
           } else if (key === 't') {
             editor.setCurrentTool('text');
           } else if (key === 'n') {
@@ -240,12 +387,13 @@ export default function Canvas() {
     return () => {
       window.removeEventListener('keydown', handleGlobalKeyDown);
     };
-  }, [editor]);
+  }, [editor, active]);
 
   // Synchronize canvas dragging/pointing state to shield iframes from eating pointer events during lasso/pan/drag
   const [isCanvasDragging, setIsCanvasDragging] = useState(false);
 
   useEffect(() => {
+    if (!active) return;
     let isPointerDown = false;
 
     const setDragActive = (active: boolean) => {
@@ -258,7 +406,7 @@ export default function Canvas() {
       const target = e.target as HTMLElement | null;
       if (
         target?.closest('.liquid-glass-dock, .liquid-glass-popover, aside[aria-label*="Siri"], .canvasos-hud, .visionos-hud') ||
-        target?.closest('aside[data-visionos-panel="true"], aside[aria-label*="visionOS"]')
+        target?.closest('aside[data-visionos-panel="true"], aside[aria-label*="visionOS"], [data-scrollable="true"]')
       ) {
         return;
       }
@@ -292,16 +440,44 @@ export default function Canvas() {
       window.removeEventListener('blur', handlePointerUp);
       document.documentElement.classList.remove('canvas-is-dragging');
     };
-  }, []);
+  }, [active]);
+
+  useEffect(() => {
+    if (!editor) return;
+    if (active) {
+      editor.updateViewportScreenBounds(editor.getContainer(), true);
+      editor.focus();
+    }
+    else {
+      editor.complete();
+      editor.blur();
+      try { writeWorkspaceSummary(captureWorkspaceSummary(editor)); } catch {}
+    }
+  }, [editor, active]);
 
   return (
-    <main
-      className={`canvas-wrapper fixed inset-0 w-screen h-screen bg-[#0b0d18] select-none ${
-        isCanvasDragging ? 'canvas-is-dragging' : ''
-      }`}
-    >
+    <WorkspaceActivity.Provider value={active}>
+    <MotionConfig reducedMotion="user">
+      <main
+        aria-hidden={!active}
+        inert={!active}
+        style={active ? undefined : { display: 'none' }}
+        className={`canvas-wrapper fixed inset-0 w-screen h-screen bg-[var(--studio-workspace)] select-none ${
+          isCanvasDragging ? 'canvas-is-dragging' : ''
+        }`}
+      >
       {/* Apple-Grade Pages & Canvas Manager Pill (Top-Left) */}
-      <ApplePagesPill editor={editor} />
+      <ApplePagesPill
+        editor={editor}
+        openBackupsRequest={backupsRequest}
+        onBackupsOpened={() => setBackupsRequest(undefined)}
+        onGoToDashboard={onGoToDashboard}
+        recovery={{
+          state: recovery,
+          onKeepCurrent: recovery.keepCurrent,
+          onRestoreRecovery: recovery.restoreRecovery,
+        }}
+      />
 
       {/* Apple-Grade Floating Island Dock (Bottom HUD Primary Controls) */}
       <AppleFloatingDock editor={editor} />
@@ -313,24 +489,14 @@ export default function Canvas() {
       <ContextualFormattingPill editor={editor} spatial={spatial} ai={ai} />
 
       {/* visionOS Spatial Intelligence Liquid Glass AI Assistant & Omnibar */}
-      <SpatialAIOmnibar ai={ai} spatial={spatial} />
+      <SpatialAIOmnibar active={active} ai={ai} spatial={spatial} initialDraft={composerDraft?.text} draftId={composerDraft?.id} onDraftConsumed={() => setComposerDraft(undefined)} />
 
-      {/* visionOS First-Time User Interactive Onboarding Flow */}
-      <VisionOnboardingModal
-        isOpen={showOnboarding}
-        onClose={() => setShowOnboarding(false)}
-        geminiKeys={ai.geminiApiKeys}
-        onSaveGeminiKey={(k) => {
-          ai.addGeminiKey(k);
-          ai.setProvider('gemini');
-        }}
-        selectedModel={ai.geminiModel}
-        onSelectModel={(m) => {
-          ai.setGeminiModel(m);
-          ai.setProvider('gemini');
-        }}
-        editor={editor}
-      />
+      {showHint && <aside data-canvas-chrome className="studio-canvas-hint" aria-label="Canvas tip">
+        <div><strong>Try one thing</strong><p>Add a note, draw a shape, or ask AI. Select the sample sketch to explore its finished app.</p></div>
+        <button type="button" onClick={dismissHint} aria-label="Dismiss canvas tip">Dismiss</button>
+      </aside>}
+      {launchIntent && recovery.status === 'conflict' && <aside data-canvas-chrome className="studio-launch-status" role="status">A recovery copy needs review. Review it in Data &amp; backups; your requested action will wait.</aside>}
+      {launchError && <aside data-canvas-chrome className="studio-launch-status" role="alert">{launchError}<button type="button" onClick={() => { failedIntent.current = null; setLaunchError(''); setRetry((n) => n + 1); }}>Retry action</button><button type="button" onClick={() => { if (launchIntent) onIntentConsumed?.(launchIntent.id); setLaunchError(''); }}>Dismiss</button></aside>}
 
       {/* Glowing Speculative Skeleton Overlay (<150ms TTFT Wireframes) */}
       <SpeculativeSkeletonOverlay editor={editor} skeletons={spatial.skeletons} />
@@ -349,6 +515,8 @@ export default function Canvas() {
         inferDarkMode
         onMount={handleMount}
       />
-    </main>
+      </main>
+    </MotionConfig>
+    </WorkspaceActivity.Provider>
   );
 }

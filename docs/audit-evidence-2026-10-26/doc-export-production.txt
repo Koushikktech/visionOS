@@ -1,0 +1,10 @@
+{
+  "engine": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+  "markdownFilename": "webkit_script_bad_script_report.md",
+  "htmlFilename": "webkit_script_bad_script_report.html",
+  "markdownBytes": 436,
+  "htmlBytes": 2704,
+  "markdownContainsEditedContent": true,
+  "htmlMetadataEscaped": true,
+  "errors": []
+}

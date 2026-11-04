@@ -1,0 +1,1 @@
+Artifact right-click and drag-release did not activate Run app; primary click did.

@@ -3,6 +3,7 @@ import {
   buildSpatialContextText,
   convertToolCallToActionFrame,
   isCanvasActionIntent,
+  isExplicitCanvasMutationCommand,
   extractActionFramesFromText,
   getFrameCleanSummary,
 } from './prompt';
@@ -65,6 +66,48 @@ describe('prompt & grounded context utilities', () => {
     expect(text).toContain('Multimodal Vision Snapshot Attached: YES');
   });
 
+  it('includes complete editable source for selected decks and only a preview for nearby decks', () => {
+    const request: AISpatialChatRequest = {
+      messages: [{ role: 'user', content: 'Refine the selected deck.' }],
+      culledContext: {
+        selectedNodes: [{
+          id: 'shape:selected-deck', type: 'slide_deck', minX: 0, minY: 0, maxX: 800, maxY: 500,
+          title: 'Product launch', theme: 'ocean', currentSlideIndex: 1,
+          slides: [
+            { id: 'slide-1', title: 'Intro', layout: 'hero', speakerNotes: 'Open with the user need.' },
+            { id: 'slide-2', title: 'Results', layout: 'stats', stats: [{ label: 'Adoption', value: '42%', change: '+8%' }] },
+          ],
+        }],
+        viewportNeighbors: [{
+          id: 'shape:nearby-deck', type: 'slide_deck', minX: 900, minY: 0, maxX: 1700, maxY: 500,
+          title: 'Nearby', theme: 'paper', slides: [{ id: 'private', title: 'Preview only', content: 'Do not include this body.' }],
+        }],
+        macroClusters: [], totalTokenEstimate: 100,
+      },
+    };
+    const text = buildSpatialContextText(request);
+    expect(text).toContain('Deck theme: ocean');
+    expect(text).toContain('Active slide index: 1');
+    expect(text).toContain('Open with the user need.');
+    expect(text).toContain('Adoption');
+    expect(text).toContain('Deck preview: 1 slides, theme paper');
+    expect(text).not.toContain('Do not include this body.');
+  });
+
+  it('converts native deck create and full-replacement tool calls', () => {
+    const created = convertToolCallToActionFrame('create_slide_deck', {
+      id: 'launch-deck', title: 'Launch', theme: 'plum',
+      slides: [{ id: 'intro', title: 'Introduction', layout: 'hero', speakerNotes: 'Set context.' }],
+    });
+    expect(created).toMatchObject({ op: 'create_slide_deck', theme: 'plum', currentSlideIndex: 0 });
+
+    const mutated = convertToolCallToActionFrame('mutate_slide_deck', {
+      target: 'shape:launch-deck', theme: 'paper',
+      slides: [{ id: 'intro', title: 'Introduction', layout: 'split' }],
+    });
+    expect(mutated).toMatchObject({ op: 'mutate_slide_deck', target: 'shape:launch-deck', theme: 'paper' });
+  });
+
   it('converts spawn_artifact tool call with relative anchor and default 780x540 dimensions', () => {
     const frame = convertToolCallToActionFrame('spawn_artifact', {
       id: 'app_calculator',
@@ -123,6 +166,20 @@ describe('prompt & grounded context utilities', () => {
     expect(frame?.label).toBe('implements');
   });
 
+  it('does not log an unrecognized provider tool name or arguments', () => {
+    const previousWarn = console.warn;
+    const secret = 'private-canvas-source-123';
+    let logged = '';
+    console.warn = (...args) => { logged += args.join(' '); };
+    try {
+      expect(convertToolCallToActionFrame('private_tool_name_123', { source: secret })).toBeNull();
+      expect(logged).not.toContain(secret);
+      expect(logged).not.toContain('private_tool_name_123');
+    } finally {
+      console.warn = previousWarn;
+    }
+  });
+
   describe('isCanvasActionIntent', () => {
     it('returns false for pure greetings and pleasantries', () => {
       expect(isCanvasActionIntent('hi')).toBe(false);
@@ -170,6 +227,20 @@ describe('prompt & grounded context utilities', () => {
       expect(isCanvasActionIntent('remake this app with better ui and fuctionality', false)).toBe(true);
       expect(isCanvasActionIntent('rebuild this app', true)).toBe(true);
       expect(isCanvasActionIntent('hi', true)).toBe(false); // even with selection, 'hi' is still not a canvas action!
+    });
+  });
+
+  describe('isExplicitCanvasMutationCommand', () => {
+    it('recognizes direct editing commands and polite command forms', () => {
+      expect(isExplicitCanvasMutationCommand('create a card about biology')).toBe(true);
+      expect(isExplicitCanvasMutationCommand('Could you please move this card?')).toBe(true);
+      expect(isExplicitCanvasMutationCommand('make real')).toBe(true);
+    });
+
+    it('leaves questions and conversational requests available in read-only mode', () => {
+      expect(isExplicitCanvasMutationCommand('How do I create a card?')).toBe(false);
+      expect(isExplicitCanvasMutationCommand('Can you explain this diagram?')).toBe(false);
+      expect(isExplicitCanvasMutationCommand('Summarize these shapes')).toBe(false);
     });
   });
 

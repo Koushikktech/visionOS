@@ -16,8 +16,6 @@ import {
   Check,
   WrapText,
   Pencil,
-  Eye,
-  GripHorizontal,
   FileCode,
   Terminal,
 } from 'lucide-react';
@@ -40,6 +38,10 @@ import 'prismjs/components/prism-yaml';
 import 'prismjs/components/prism-markdown';
 import 'prismjs/components/prism-css';
 import { smartStopPropagation } from '../lib/panModifier';
+import { useShapeDraft } from '../hooks/useShapeDraft';
+import { ShapeFocusLayer } from '../components/ShapeFocusLayer';
+import { ArtifactHeaderActions } from '../components/ArtifactHeaderActions';
+import { subscribeToShapeEditing } from '../lib/shapeEditing';
 
 export type TLCodeCardShape = TLBaseShape<
   'code_card',
@@ -114,11 +116,37 @@ function CodeCardComponent({
   const [copied, setCopied] = useState(false);
   const [wrapLines, setWrapLines] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(shape.props.title);
-  const [editCode, setEditCode] = useState(shape.props.code);
-  const [editLanguage, setEditLanguage] = useState(shape.props.language);
+  const [saveError, setSaveError] = useState('');
+  const draft = useShapeDraft(
+    `code_card:${shape.id}`,
+    {
+      title: shape.props.title,
+      language: shape.props.language,
+      code: shape.props.code,
+    },
+    { editor, shapeId: shape.id }
+  );
+  const editTitle = draft.value.title;
+  const editCode = draft.value.code;
+  const editLanguage = draft.value.language;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const frame = requestAnimationFrame(() => textareaRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (draft.recovered) setIsEditing(true);
+  }, [draft.recovered]);
+
+  useEffect(() => subscribeToShapeEditing(shape.id, () => {
+    const current = editor?.getShape?.(shape.id);
+    if (!current || editor?.getIsReadonly?.() || editor?.isShapeOrAncestorLocked?.(current)) return;
+    setIsEditing(true);
+  }), [editor, shape.id]);
 
   const { w, h, title, language, code, description, isStreaming } = shape.props;
   const normLang = normalizeLanguage(language);
@@ -128,12 +156,6 @@ function CodeCardComponent({
     text: 'text-indigo-300',
     border: 'border-indigo-500/30',
   };
-
-  useEffect(() => {
-    setEditTitle(shape.props.title);
-    setEditCode(shape.props.code);
-    setEditLanguage(shape.props.language);
-  }, [shape.props.title, shape.props.code, shape.props.language]);
 
   const handleCopy = useCallback(
     (e: React.MouseEvent) => {
@@ -146,17 +168,38 @@ function CodeCardComponent({
   );
 
   const handleSaveEdit = useCallback(() => {
-    setIsEditing(false);
-    onUpdate({
+    const next = {
       title: editTitle.trim() || 'code_snippet',
       language: editLanguage.trim() || 'javascript',
       code: editCode,
-    });
-  }, [editTitle, editLanguage, editCode, onUpdate]);
+    };
+    setSaveError('');
+    try {
+      onUpdate(next);
+      const savedShape = editor?.getShape?.(shape.id);
+      if (
+        savedShape?.type !== 'code_card' ||
+        savedShape.props.title !== next.title ||
+        savedShape.props.language !== next.language ||
+        savedShape.props.code !== next.code
+      )
+        throw new Error('The code could not be saved to the canvas. Your draft is still here.');
+      draft.save(next);
+      setIsEditing(false);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'The code could not be saved. Your draft is still here.');
+    }
+  }, [editTitle, editLanguage, editCode, onUpdate, editor, shape.id, draft.save]);
+
+  const handleDiscardEdit = useCallback(() => {
+    draft.discard();
+    setSaveError('');
+    setIsEditing(false);
+  }, [draft.discard]);
 
   // Syntax highlighting with line numbers
   const { lines, lineNumbers } = useMemo(() => {
-    const codeText = isEditing ? editCode : code;
+    const codeText = code;
     const grammar = Prism.languages[normLang] || Prism.languages.javascript || Prism.languages.markup;
     const highlighted = Prism.highlight(codeText || '', grammar, normLang);
 
@@ -167,12 +210,13 @@ function CodeCardComponent({
       lines: splitLines,
       lineNumbers: numbers,
     };
-  }, [code, editCode, isEditing, normLang]);
+  }, [code, normLang]);
 
   return (
+    <>
     <HTMLContainer
       id={shape.id}
-      className="pointer-events-auto overflow-hidden rounded-2xl liquid-glass-card transition-all flex flex-col font-sans antialiased"
+      className="studio-native-window studio-native-code-window pointer-events-auto overflow-hidden rounded-2xl transition-colors flex flex-col font-sans antialiased"
       style={{
         width: w,
         height: h,
@@ -180,39 +224,20 @@ function CodeCardComponent({
     >
       {/* Top Window Bar */}
       <div
+        data-window-header="code"
         className="flex h-11 w-full shrink-0 items-center justify-between liquid-glass-header px-3.5 select-none cursor-grab active:cursor-grabbing"
       >
         <div className="flex items-center gap-2 overflow-hidden flex-1 mr-2">
-          {/* macOS window dots */}
-          <div className="flex items-center gap-1.5 mr-1 shrink-0 opacity-75">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]" />
-            <div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
-            <div className="w-2.5 h-2.5 rounded-full bg-[#27c93f]" />
-          </div>
-
           <FileCode className="h-4 w-4 text-slate-400 shrink-0 ml-1" strokeWidth={1.5} />
 
-          {isEditing ? (
-            <input
-              type="text"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              onPointerDown={stopEventPropagation}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveEdit();
-              }}
-              className="bg-black/50 border border-white/20 rounded px-2 py-0.5 text-xs text-white outline-none focus:border-white/40 font-mono flex-1"
-              placeholder="filename.ext..."
-            />
-          ) : (
-            <span
-              className="truncate text-xs font-mono font-medium tracking-wide text-slate-200"
-              title={title}
-              onDoubleClick={() => setIsEditing(true)}
-            >
-              {title || 'code_snippet'}
-            </span>
-          )}
+          <span
+            data-window-title
+            className="truncate text-xs font-mono font-medium tracking-wide text-slate-200"
+            title={title}
+            onDoubleClick={() => setIsEditing(true)}
+          >
+            {title || 'code_snippet'}
+          </span>
 
           <span
             className="shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-mono tabular-nums text-slate-400 bg-white/5 border border-white/10 uppercase tracking-wider"
@@ -228,40 +253,14 @@ function CodeCardComponent({
         </div>
 
         {/* Code Card Controls */}
-        <div
-          className="flex items-center gap-1 shrink-0"
-          onPointerDown={stopEventPropagation}
-        >
-          <button
-            type="button"
-            onClick={() => setWrapLines(!wrapLines)}
-            title={wrapLines ? 'Disable Line Wrap' : 'Enable Line Wrap'}
-            className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg transition-all active:scale-[0.96] ${
-              wrapLines ? 'bg-white/15 text-white' : 'text-slate-400 hover:bg-white/10 hover:text-slate-100'
-            }`}
-          >
-            <WrapText className="h-4 w-4" strokeWidth={1.5} />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (isEditing) handleSaveEdit();
-              else setIsEditing(true);
-            }}
-            title={isEditing ? 'Save / View Highlighted' : 'Edit Source Code'}
-            className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-slate-100 active:scale-[0.96] transition-all"
-          >
-            {isEditing ? <Eye className="h-4 w-4 text-indigo-400" strokeWidth={1.5} /> : <Pencil className="h-4 w-4" strokeWidth={1.5} />}
-          </button>
-          <button
-            type="button"
-            onClick={handleCopy}
-            title={copied ? 'Copied to Clipboard!' : 'Copy Source Code'}
-            className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-slate-100 active:scale-[0.96] transition-all"
-          >
-            {copied ? <Check className="h-4 w-4 text-emerald-400" strokeWidth={1.5} /> : <Copy className="h-4 w-4" strokeWidth={1.5} />}
-          </button>
-        </div>
+        <ArtifactHeaderActions
+          menuLabel="Code card actions"
+          primaryAction={{ label: 'Edit source code', icon: <Pencil />, onSelect: () => setIsEditing(true) }}
+          actions={[
+            { id: 'line-wrap', label: wrapLines ? 'Disable line wrap' : 'Enable line wrap', icon: <WrapText />, onSelect: () => setWrapLines((current) => !current) },
+            { id: 'copy', label: copied ? 'Source code copied' : 'Copy source code', icon: copied ? <Check /> : <Copy />, onSelect: handleCopy },
+          ]}
+        />
       </div>
 
       {description && (
@@ -273,23 +272,11 @@ function CodeCardComponent({
       {/* Main Code Block with Line Numbers */}
       <div
         data-scrollable="true"
-        className="relative flex-1 min-h-0 w-full overflow-auto liquid-glass-code-bg p-3 text-[11px] font-mono leading-relaxed select-text overscroll-contain custom-card-scrollbar"
+        className="relative flex-1 min-h-0 w-full overflow-auto liquid-glass-code-bg p-3 text-xs font-mono leading-relaxed select-text overscroll-contain custom-card-scrollbar"
         onPointerDown={isSelected ? smartStopPropagation : undefined}
         onDoubleClick={() => !isEditing && setIsEditing(true)}
       >
-        {isEditing ? (
-          <textarea
-            ref={textareaRef}
-            value={editCode}
-            onChange={(e) => setEditCode(e.target.value)}
-            onPointerDown={smartStopPropagation}
-            data-scrollable="true"
-            placeholder="Paste or write your source code here..."
-            className="w-full h-full resize-none bg-black/40 border border-white/10 rounded-xl p-3 font-mono text-xs text-sky-100 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-            spellCheck={false}
-          />
-        ) : (
-          <div className="flex min-w-full">
+        <div className="flex min-w-full">
             {/* Line Numbers Gutter */}
             <div className="shrink-0 pr-3 mr-3 text-right select-none text-slate-500 border-r border-white/10 font-mono text-[11px] tabular-nums">
               {lineNumbers.map((num) => (
@@ -316,10 +303,68 @@ function CodeCardComponent({
                 <span className="inline-block w-1.5 h-3.5 ml-1 bg-sky-400 animate-pulse align-middle" />
               )}
             </div>
-          </div>
-        )}
+        </div>
       </div>
     </HTMLContainer>
+    {isEditing && (
+      <ShapeFocusLayer title={`Edit ${editTitle || title || 'code'}`} onClose={() => setIsEditing(false)}>
+        <div className="flex h-full min-h-0 flex-col gap-3 bg-slate-950 p-3 sm:p-5">
+          {(draft.hasConflict || draft.recovered || saveError || (draft.isDirty && !draft.recoveryAvailable)) && (
+            <div
+              role={saveError ? 'alert' : 'status'}
+              className="shrink-0 rounded-xl border border-amber-300/25 bg-amber-400/10 px-3 py-2.5 text-sm leading-relaxed text-amber-100"
+            >
+              {saveError ||
+                (draft.hasConflict
+                  ? 'Canvas content changed while this draft was open. Save to replace the latest content, or discard to load it.'
+                  : !draft.recoveryAvailable
+                    ? 'This draft is too large for recovery after a reload. Save it to the canvas now.'
+                    : 'Recovered an unsaved code draft. Save or discard it when ready.')}
+            </div>
+          )}
+          <div className="grid shrink-0 gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-200">
+              File name
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => draft.setValue((current) => ({ ...current, title: e.target.value }))}
+                onPointerDown={stopEventPropagation}
+                className="min-h-11 rounded-xl border border-white/15 bg-black/45 px-3 text-base text-white outline-none focus:border-sky-300 focus-visible:ring-2 focus-visible:ring-sky-300/70"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-slate-200">
+              Language
+              <input
+                type="text"
+                value={editLanguage}
+                onChange={(e) => draft.setValue((current) => ({ ...current, language: e.target.value }))}
+                onPointerDown={stopEventPropagation}
+                className="min-h-11 rounded-xl border border-white/15 bg-black/45 px-3 text-base text-white outline-none focus:border-sky-300 focus-visible:ring-2 focus-visible:ring-sky-300/70"
+              />
+            </label>
+          </div>
+          <label className="flex min-h-0 flex-1 flex-col gap-1.5 text-sm font-medium text-slate-200">
+            Source code
+            <textarea
+              ref={textareaRef}
+              value={editCode}
+              onChange={(e) => draft.setValue((current) => ({ ...current, code: e.target.value }))}
+              data-scrollable="true"
+              placeholder="Paste or write your source code here..."
+              className="min-h-0 w-full flex-1 resize-none rounded-xl border border-white/15 bg-black/45 p-3 font-mono text-base leading-relaxed text-sky-100 outline-none focus:border-sky-300 focus-visible:ring-2 focus-visible:ring-sky-300/70"
+              spellCheck={false}
+            />
+          </label>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-white/10 pt-3">
+            <button type="button" onClick={() => setIsEditing(false)} className="min-h-11 rounded-xl px-4 text-sm font-medium text-slate-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70">Return to canvas</button>
+            <button type="button" onClick={handleDiscardEdit} className="min-h-11 rounded-xl border border-white/15 px-4 text-sm font-medium text-slate-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70">Discard draft</button>
+            <button type="button" onClick={handleSaveEdit} className="min-h-11 rounded-xl bg-sky-500 px-4 text-sm font-semibold text-white hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200">Save code</button>
+          </div>
+        </div>
+      </ShapeFocusLayer>
+    )}
+    </>
   );
 }
 

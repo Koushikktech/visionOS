@@ -11,6 +11,7 @@ import {
 } from '@tldraw/tldraw';
 import React, { useMemo } from 'react';
 import { Database, Cloud, Diamond, Cpu, Layers, GripHorizontal, Box } from 'lucide-react';
+import '../components/canvas-chrome.css';
 import { smartStopPropagation } from '../lib/panModifier';
 import type { VectorGlyphType } from '../types/spatial';
 
@@ -76,22 +77,20 @@ function VectorComponent({
   return (
     <HTMLContainer
       id={shape.id}
-      className="pointer-events-auto overflow-hidden rounded-2xl liquid-glass-card transition-all flex flex-col antialiased"
+      className="studio-native-window studio-native-vector pointer-events-auto overflow-hidden rounded-2xl transition-colors flex flex-col antialiased"
       style={{
         width: w,
         height: h,
-        border: '1px solid rgba(255, 255, 255, 0.10)',
-        boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.10)',
-        backgroundColor: 'rgba(18, 18, 24, 0.82)',
       }}
     >
       {/* Drag & Title Header */}
       <div
+        data-window-header="vector"
         className="flex h-10 w-full shrink-0 items-center justify-between px-3 select-none cursor-grab active:cursor-grabbing liquid-glass-header"
       >
         <div className="flex items-center gap-2 overflow-hidden flex-1 mr-2">
           {typeIcon}
-          <span className="truncate text-xs font-semibold tracking-wide text-white" title={title}>
+          <span data-window-title className="truncate text-xs font-semibold tracking-wide text-white" title={title}>
             {title || `${vectorType.toUpperCase()} Glyph`}
           </span>
           <span

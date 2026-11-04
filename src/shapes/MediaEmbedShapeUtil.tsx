@@ -15,10 +15,12 @@ import {
   Globe,
   Music,
   ExternalLink,
-  GripHorizontal,
   Play,
+  Hand,
 } from 'lucide-react';
-import { smartStopPropagation, isSpacePanHeld } from '../lib/panModifier';
+import { smartStopPropagation } from '../lib/panModifier';
+import { resolveMediaEmbedPlan } from '../lib/mediaEmbed';
+import { ArtifactHeaderActions } from '../components/ArtifactHeaderActions';
 
 export type TLMediaEmbedShape = TLBaseShape<
   'media_embed',
@@ -41,25 +43,22 @@ export const mediaEmbedShapeProps: RecordProps<TLMediaEmbedShape> = {
   color: T.string,
 };
 
-function extractYouTubeVideoId(url: string): string | null {
-  if (!url) return null;
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-  const match = url.match(regExp);
-  return match && match[2].length === 11 ? match[2] : null;
-}
-
 function MediaEmbedComponent({
   shape,
   editor,
-  onUpdate,
 }: {
   shape: TLMediaEmbedShape;
   editor?: import('@tldraw/tldraw').Editor;
-  onUpdate: (updates: Partial<TLMediaEmbedShape['props']>) => void;
 }) {
   const [isSelected, setIsSelected] = useState(false);
-  const { w, h, title, mediaType, color } = shape.props;
-  const url = /^https?:\/\//i.test(shape.props.url) ? shape.props.url : '';
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [audioFailed, setAudioFailed] = useState(false);
+  const { w, h, title, mediaType } = shape.props;
+  const plan = useMemo(
+    () => resolveMediaEmbedPlan(shape.props.url, mediaType),
+    [shape.props.url, mediaType]
+  );
+  const url = plan.url?.href ?? '';
 
   useEffect(() => {
     if (!editor) return;
@@ -72,18 +71,13 @@ function MediaEmbedComponent({
     return editor.store.listen(checkSelected);
   }, [editor, shape.id]);
 
-  const youtubeVideoId = useMemo(() => {
-    if (
-      mediaType === 'youtube' ||
-      url.includes('youtube.com') ||
-      url.includes('youtu.be')
-    ) {
-      return extractYouTubeVideoId(url);
-    }
-    return null;
-  }, [url, mediaType]);
+  useEffect(() => {
+    if (!isSelected) setIsInteracting(false);
+  }, [isSelected]);
 
-  const effectiveType = youtubeVideoId ? 'youtube' : mediaType || 'web';
+  useEffect(() => setAudioFailed(false), [url]);
+
+  const effectiveType = plan.kind === 'youtube' ? 'youtube' : mediaType || 'web';
 
   const typeIcon = useMemo(() => {
     switch (effectiveType) {
@@ -99,17 +93,18 @@ function MediaEmbedComponent({
   return (
     <HTMLContainer
       id={shape.id}
-      className="pointer-events-auto overflow-hidden rounded-2xl liquid-glass-card transition-all flex flex-col antialiased"
+      className="studio-native-window studio-native-media-window pointer-events-auto overflow-hidden rounded-2xl transition-colors flex flex-col antialiased"
       style={{
         width: w,
         height: h,
       }}
     >
       {/* Top Drag & Control Header */}
-      <div className="flex h-11 w-full shrink-0 items-center justify-between liquid-glass-header px-3.5 select-none cursor-grab active:cursor-grabbing">
+      <div data-window-header="media" className="flex h-11 w-full shrink-0 items-center justify-between liquid-glass-header px-3.5 select-none cursor-grab active:cursor-grabbing">
         <div className="flex items-center gap-2 overflow-hidden flex-1 mr-2">
           {typeIcon}
           <span
+            data-window-title
             className="truncate text-xs font-semibold tracking-wide text-slate-200"
             title={title || url}
           >
@@ -121,47 +116,43 @@ function MediaEmbedComponent({
           </span>
         </div>
 
-        <div
-          className="flex items-center gap-1 shrink-0"
-          onPointerDown={stopEventPropagation}
-        >
-          {url && (
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              title="Open link in new tab"
-              className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white active:scale-[0.96] transition-all"
-            >
-              <ExternalLink className="h-4 w-4" strokeWidth={1.5} />
-            </a>
-          )}
-          <div className="text-slate-500 hover:text-slate-300 p-1">
-            <GripHorizontal className="h-4 w-4" strokeWidth={1.5} />
-          </div>
-        </div>
+        <ArtifactHeaderActions
+          menuLabel="Media actions"
+          primaryAction={plan.kind === 'youtube' || plan.kind === 'audio'
+            ? {
+                label: isInteracting ? 'Return to canvas' : 'Interact',
+                icon: isInteracting ? <Hand /> : <Play />,
+                pressed: isInteracting,
+                onSelect: () => {
+                  if (!isInteracting) editor?.setSelectedShapes([shape.id]);
+                  setIsInteracting((current) => !current);
+                },
+              }
+            : url
+              ? { label: 'Open link in new tab', icon: <ExternalLink />, href: url, target: '_blank', rel: 'noopener noreferrer' }
+              : undefined}
+          actions={url && (plan.kind === 'youtube' || plan.kind === 'audio')
+            ? [{ id: 'open-link', label: 'Open link in new tab', icon: <ExternalLink />, href: url, target: '_blank', rel: 'noopener noreferrer' }]
+            : []}
+        />
       </div>
 
       {/* Main Content Area */}
       <div
         className="relative flex-1 w-full bg-[#0b0e1c] overflow-hidden flex items-center justify-center"
-        onPointerDown={isSelected ? smartStopPropagation : undefined}
+        onPointerDown={isSelected && isInteracting ? smartStopPropagation : undefined}
       >
-        {/* Transparent Selection Shield when unselected: prevents iframe from stealing pointer events so 1-click select & drag work natively */}
-        {!isSelected && (
-          <div className="absolute inset-0 z-10 bg-transparent cursor-pointer" />
-        )}
-        {effectiveType === 'youtube' && youtubeVideoId ? (
+        {plan.kind === 'youtube' && isInteracting && isSelected ? (
           <iframe
-            src={`https://www.youtube-nocookie.com/embed/${youtubeVideoId}?autoplay=0&rel=0`}
+            src={`https://www.youtube-nocookie.com/embed/${plan.videoId}?autoplay=0&rel=0`}
             title={title || 'YouTube video'}
             className="w-full h-full border-0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
-        ) : effectiveType === 'audio' ? (
+        ) : plan.kind === 'audio' && isInteracting && isSelected ? (
           <div className="flex flex-col items-center justify-center gap-4 p-6 w-full text-center">
-            <div className="h-16 w-16 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg animate-pulse">
+            <div className="h-16 w-16 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg">
               <Play className="h-7 w-7 ml-0.5" />
             </div>
             <div className="max-w-[80%]">
@@ -172,22 +163,41 @@ function MediaEmbedComponent({
                 {url}
               </p>
             </div>
-            <audio
-              controls
-              src={url}
-              className="w-full max-w-sm mt-2 rounded-lg opacity-90"
-            >
-              Your browser does not support audio playback.
-            </audio>
+            {audioFailed ? (
+              <p role="status" className="text-xs text-amber-200">
+                Audio playback failed here. Use Open link above to try the source directly.
+              </p>
+            ) : (
+              <audio
+                controls
+                src={url}
+                onError={() => setAudioFailed(true)}
+                className="w-full max-w-sm mt-2 rounded-lg opacity-90"
+              >
+                Your browser does not support audio playback.
+              </audio>
+            )}
+          </div>
+        ) : plan.kind === 'unsupported' ? (
+          <div className="flex max-w-md flex-col items-center gap-3 p-6 text-center">
+            <Globe className="h-8 w-8 text-sky-300" aria-hidden="true" />
+            <h4 className="text-sm font-semibold text-slate-100">Web preview unavailable</h4>
+            <p className="text-xs leading-relaxed text-slate-300">
+              This site is not a supported embedded player. Open the link above to view it.
+            </p>
+            {!url && (
+              <p role="status" className="text-xs text-amber-200">
+                This address is not a safe HTTP or HTTPS link.
+              </p>
+            )}
           </div>
         ) : (
-          <div className="relative w-full h-full flex flex-col">
-            <iframe
-              src={url}
-              title={title || 'Web Preview'}
-              sandbox="allow-scripts allow-popups"
-              className="w-full h-full border-0 bg-white"
-            />
+          <div className="flex max-w-md flex-col items-center gap-3 p-6 text-center">
+            <Video className="h-8 w-8 text-red-300" aria-hidden="true" />
+            <h4 className="text-sm font-semibold text-slate-100">{title || 'YouTube video'}</h4>
+            <p className="text-xs leading-relaxed text-slate-300">
+              Choose Interact to load the YouTube player, or open the source link above.
+            </p>
           </div>
         )}
       </div>
@@ -235,18 +245,7 @@ export class MediaEmbedShapeUtil extends BaseBoxShapeUtil<TLMediaEmbedShape> {
   }
 
   override component(shape: TLMediaEmbedShape) {
-    const onUpdate = (updates: Partial<TLMediaEmbedShape['props']>) => {
-      this.editor.updateShape<TLMediaEmbedShape>({
-        id: shape.id,
-        type: 'media_embed',
-        props: {
-          ...shape.props,
-          ...updates,
-        },
-      });
-    };
-
-    return <MediaEmbedComponent shape={shape} editor={this.editor} onUpdate={onUpdate} />;
+    return <MediaEmbedComponent shape={shape} editor={this.editor} />;
   }
 
   override indicator(shape: TLMediaEmbedShape) {

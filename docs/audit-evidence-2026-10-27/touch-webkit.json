@@ -1,0 +1,107 @@
+[
+  {
+    "size": "320x568",
+    "type": "Rich Card",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "320x568",
+    "type": "Code Card",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "320x568",
+    "type": "Document",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "320x568",
+    "type": "Slide Deck",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "320x568",
+    "type": "Interactive App",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "768x1024",
+    "type": "Rich Card",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "768x1024",
+    "type": "Code Card",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "768x1024",
+    "type": "Document",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "768x1024",
+    "type": "Slide Deck",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "768x1024",
+    "type": "Interactive App",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "1024x768",
+    "type": "Rich Card",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "1024x768",
+    "type": "Code Card",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "1024x768",
+    "type": "Document",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "1024x768",
+    "type": "Slide Deck",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  },
+  {
+    "size": "1024x768",
+    "type": "Interactive App",
+    "inBounds": true,
+    "dialogCount": 1,
+    "errors": []
+  }
+]

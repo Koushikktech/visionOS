@@ -1,0 +1,20 @@
+Restricted image/fetch/form blocked; paused import had0iframes
+Granted hits [
+  {
+    url: 'https://visionos-network-qa.invalid/api',
+    method: 'GET',
+    resource: 'fetch'
+  },
+  {
+    url: 'https://visionos-network-qa.invalid/image.png',
+    method: 'GET',
+    resource: 'image'
+  },
+  {
+    url: 'https://visionos-network-qa.invalid/form',
+    method: 'POST',
+    resource: 'document'
+  }
+]
+Source edit revoked grant; external image/fetch/form blocked again
+Self-navigation limitation observed true

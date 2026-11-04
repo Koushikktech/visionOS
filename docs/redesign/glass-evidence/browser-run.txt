@@ -1,0 +1,2 @@
+chromium: navigation, drafts and responsive layouts passed
+webkit: navigation, drafts and responsive layouts passed

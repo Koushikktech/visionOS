@@ -1,0 +1,45 @@
+RUN WebKit
+REQUESTFAILED font https://cdn.tldraw.com/3.15.6/fonts/IBMPlexSans-MediumItalic.woff2 { errorText: 'cancelled' }
+REQUESTFAILED font https://cdn.tldraw.com/3.15.6/fonts/IBMPlexSerif-Medium.woff2 { errorText: 'cancelled' }
+REQUESTFAILED font https://cdn.tldraw.com/3.15.6/fonts/IBMPlexSerif-BoldItalic.woff2 { errorText: 'cancelled' }
+REQUESTFAILED font https://cdn.tldraw.com/3.15.6/fonts/IBMPlexMono-Bold.woff2 { errorText: 'cancelled' }
+REQUESTFAILED fetch https://cdn.tldraw.com/3.15.6/translations/en.json { errorText: 'cancelled' }
+REQUESTFAILED font https://cdn.tldraw.com/3.15.6/fonts/IBMPlexSans-BoldItalic.woff2 { errorText: 'cancelled' }
+REQUESTFAILED font https://cdn.tldraw.com/3.15.6/fonts/IBMPlexSerif-Bold.woff2 { errorText: 'cancelled' }
+REQUESTFAILED image https://cdn.tldraw.com/3.15.6/icons/icon/0_merged.svg { errorText: 'cancelled' }
+REQUESTFAILED font https://cdn.tldraw.com/3.15.6/fonts/IBMPlexSerif-MediumItalic.woff2 { errorText: 'cancelled' }
+REQUESTFAILED font https://cdn.tldraw.com/3.15.6/fonts/IBMPlexMono-MediumItalic.woff2 { errorText: 'cancelled' }
+REQUESTFAILED fetch https://cdn.tldraw.com/3.15.6/translations/en.json { errorText: 'cancelled' }
+REQUESTFAILED font https://cdn.tldraw.com/3.15.6/fonts/IBMPlexMono-Medium.woff2 { errorText: 'cancelled' }
+PAGEERROR 
+PAGEERROR Unhandled Promise Rejection: TypeError: Load failed
+    at unknown (http://127.0.0.1:3005/_next/static/chunks/473.df0b63f6456c2afd.js:1376:48443)
+BODY visionOS
+SPATIAL
+Page 1
+2
+Recovery copy saved on this device
+100%
+Ask visionOS Spatial AI...
+K
+After failure
+NOTE
+
+Canvas still accepts edits.
+
+Preserved card
+NOTE
+
+This must survive a failed restore.
+DEBUG { recognitions: undefined, microphones: undefined, held: 'undefined' }
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ [
++   'Unhandled Promise Rejection: EncodingError: Loading was canceled.',
++   'Unhandled Promise Rejection: TypeError: Load failed'
++ ]
+- []
+
+    at run (/private/tmp/visionos-restore-webkit-debug.cjs:3:3068)
+    at async /private/tmp/visionos-restore-webkit-debug.cjs:4:86

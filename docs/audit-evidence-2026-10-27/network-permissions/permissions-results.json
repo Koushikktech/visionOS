@@ -1,0 +1,30 @@
+[
+  {
+    "engine": "Chromium",
+    "legacyGrantIgnored": true,
+    "exactOriginApproval": true,
+    "pendingStoragePreserved": true,
+    "unapprovedOriginDenied": true,
+    "http302RedirectDenied": true,
+    "linkNeedsHostClick": true,
+    "popupOpenerNull": true,
+    "rememberedAfterReload": true,
+    "revokeSucceeded": true,
+    "sourceChangeDenied": true,
+    "pageErrors": []
+  },
+  {
+    "engine": "WebKit",
+    "legacyGrantIgnored": true,
+    "exactOriginApproval": true,
+    "pendingStoragePreserved": true,
+    "unapprovedOriginDenied": true,
+    "http302RedirectDenied": false,
+    "linkNeedsHostClick": true,
+    "popupOpenerNull": true,
+    "rememberedAfterReload": true,
+    "revokeSucceeded": true,
+    "sourceChangeDenied": true,
+    "pageErrors": []
+  }
+]

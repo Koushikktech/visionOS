@@ -1,0 +1,20 @@
+[
+  {
+    "engine": "chromium",
+    "representativeShapes": 80,
+    "denseShapes": 500,
+    "idleAnimations": 0,
+    "text200NarrowReflow": true,
+    "modalFocusContained": true,
+    "permissionDefaultsPreserved": true
+  },
+  {
+    "engine": "webkit",
+    "representativeShapes": 80,
+    "denseShapes": 500,
+    "idleAnimations": 0,
+    "text200NarrowReflow": true,
+    "modalFocusContained": true,
+    "permissionDefaultsPreserved": true
+  }
+]

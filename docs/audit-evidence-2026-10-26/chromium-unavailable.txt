@@ -1,0 +1,1 @@
+Unavailable recovery leaves canvas usable; no warning before edits, warns after edits, live-document backup downloads
